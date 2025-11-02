@@ -420,8 +420,16 @@ async function loadRoutePaths() {
         
             console.log(`Displayed ${routePolylines.length} route polylines with different colors`);
         
+        if (routePolylines.length === 0) {
+            console.warn('No route polylines were created. Check coordinate data.');
+            const panelContent = document.getElementById('panel-content');
+            if (panelContent) {
+                panelContent.innerHTML = '<div class="error-message">No routes could be displayed. Check GTFS data.</div>';
+            }
+        }
+        
         // Update details panel after loading routes
-        if (mapViewMode === 'routes') {
+        if (mapViewMode === 'routes' || mapViewMode === 'both') {
             updateDetailsPanelForViewMode();
         }
         
@@ -786,8 +794,12 @@ function handleMapViewToggle(event) {
     
     if (mapViewMode === 'routes' || mapViewMode === 'both') {
         // Always reload route paths when switching to routes view
-        console.log('Loading route paths...');
-        loadRoutePaths();
+        console.log(`Loading route paths for mode: ${mapViewMode}...`);
+        loadRoutePaths().then(() => {
+            console.log('Route paths loaded successfully');
+        }).catch((error) => {
+            console.error('Failed to load route paths:', error);
+        });
     } else {
         console.log('Clearing route polylines...');
         clearRoutePolylines();

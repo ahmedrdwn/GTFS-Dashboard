@@ -361,18 +361,19 @@ def get_route_stops(route_id):
 
 @app.route('/api/routes/<route_id>/details')
 def get_route_details(route_id):
-    """Get detailed information for a specific route"""
+    """Get detailed information for a specific route - OPTIMIZED"""
     if not route_id or route_id == 'undefined':
         return jsonify({'error': 'Invalid route_id'}), 400
     
     try:
+        # Strip whitespace from route_id for matching
+        route_id = route_id.strip() if route_id else ''
+        
+        # Load data once
         routes_data = load_csv(os.path.join(GTFS_DIR, 'routes.txt'))
         trips_data = load_csv(os.path.join(GTFS_DIR, 'trips.txt'))
         stop_times = load_csv(os.path.join(GTFS_DIR, 'stop_times.txt'))
         stops_data = load_csv(os.path.join(GTFS_DIR, 'stops.txt'))
-        
-        # Strip whitespace from route_id for matching
-        route_id = route_id.strip() if route_id else ''
         
         # Get route info (strip whitespace from route_id in data for comparison)
         route = None
@@ -384,24 +385,60 @@ def get_route_details(route_id):
         if not route:
             return jsonify({'error': f'Route not found: {route_id}'}), 404
         
-        # Get all trips for this route (strip whitespace for comparison)
-        route_trips = [trip for trip in trips_data if trip.get('route_id', '').strip() == route_id]
+        # Create lookup dictionaries for performance
+        stops_dict = {}
+        for stop in stops_data:
+            stop_id = stop.get('stop_id', '').strip() if stop.get('stop_id') else ''
+            if stop_id:
+                stops_dict[stop_id] = stop
         
-        # Calculate trip details
+        # Group stop_times by trip_id for O(1) lookup
+        stop_times_by_trip = defaultdict(list)
+        for st in stop_times:
+            trip_id = st.get('trip_id', '').strip() if st.get('trip_id') else ''
+            if trip_id:
+                stop_times_by_trip[trip_id].append(st)
+        
+        # Get all trips for this route (strip whitespace for comparison)
+        route_trip_ids = set()
+        route_trips_map = {}
+        for trip in trips_data:
+            trip_route_id = trip.get('route_id', '').strip() if trip.get('route_id') else ''
+            if trip_route_id == route_id:
+                trip_id = trip.get('trip_id', '').strip() if trip.get('trip_id') else ''
+                if trip_id:
+                    route_trip_ids.add(trip_id)
+                    route_trips_map[trip_id] = trip
+        
+        total_trips = len(route_trip_ids)
+        
+        # Calculate trip details (limit to first 100 trips for performance)
         trips_with_details = []
-        for trip in route_trips:
-            trip_id = trip.get('trip_id')
-            trip_stop_times = [st for st in stop_times if st.get('trip_id') == trip_id]
+        route_trip_ids_sorted = sorted(list(route_trip_ids))[:100]  # Limit to 100 trips for UI
+        
+        for trip_id in route_trip_ids_sorted:
+            trip = route_trips_map.get(trip_id)
+            if not trip:
+                continue
+                
+            trip_stop_times = stop_times_by_trip.get(trip_id, [])
             
             if trip_stop_times:
                 # Sort by stop_sequence
-                trip_stop_times.sort(key=lambda x: int(x.get('stop_sequence', 0)))
+                try:
+                    trip_stop_times.sort(key=lambda x: int(x.get('stop_sequence', 0) or 0))
+                except (ValueError, TypeError):
+                    continue
+                    
                 first_stop = trip_stop_times[0]
                 last_stop = trip_stop_times[-1]
                 
-                # Get stop names
-                first_stop_info = next((s for s in stops_data if s.get('stop_id') == first_stop.get('stop_id')), {})
-                last_stop_info = next((s for s in stops_data if s.get('stop_id') == last_stop.get('stop_id')), {})
+                # Get stop names using dictionary lookup (O(1))
+                first_stop_id = first_stop.get('stop_id', '').strip() if first_stop.get('stop_id') else ''
+                last_stop_id = last_stop.get('stop_id', '').strip() if last_stop.get('stop_id') else ''
+                
+                first_stop_info = stops_dict.get(first_stop_id, {})
+                last_stop_info = stops_dict.get(last_stop_id, {})
                 
                 # Calculate duration
                 dep_sec = parse_time_to_seconds(first_stop.get('departure_time', ''))
@@ -414,9 +451,9 @@ def get_route_details(route_id):
                     'service_id': trip.get('service_id'),
                     'direction_id': trip.get('direction_id'),
                     'trip_headsign': trip.get('trip_headsign'),
-                    'first_stop_id': first_stop.get('stop_id'),
+                    'first_stop_id': first_stop_id,
                     'first_stop_name': first_stop_info.get('stop_name', 'N/A'),
-                    'last_stop_id': last_stop.get('stop_id'),
+                    'last_stop_id': last_stop_id,
                     'last_stop_name': last_stop_info.get('stop_name', 'N/A'),
                     'departure_time': first_stop.get('departure_time'),
                     'arrival_time': last_stop.get('arrival_time'),
@@ -424,48 +461,55 @@ def get_route_details(route_id):
                     'num_stops': len(trip_stop_times)
                 })
         
-        # Calculate average headway for this route
-        # Group stop_times by stop_id and route
-        route_stop_times = []
-        for st in stop_times:
-            if st.get('trip_id') in {t.get('trip_id') for t in route_trips}:
-                route_stop_times.append(st)
+        # Calculate average headway for this route (optimized)
+        first_stops_by_trip = {}
+        for trip_id in route_trip_ids:
+            trip_stop_times = stop_times_by_trip.get(trip_id, [])
+            if not trip_stop_times:
+                continue
+            try:
+                # Find first stop (minimum stop_sequence)
+                first_stop = min(trip_stop_times, key=lambda x: int(x.get('stop_sequence', 999) or 999))
+                first_stops_by_trip[trip_id] = first_stop
+            except (ValueError, TypeError):
+                continue
         
-        # Calculate headway at first stop (simplified)
+        # Calculate headways
+        first_stop_times = []
+        for st in first_stops_by_trip.values():
+            dep_sec = parse_time_to_seconds(st.get('departure_time', ''))
+            if dep_sec:
+                first_stop_times.append(dep_sec)
+        
+        first_stop_times.sort()
         first_stop_headways = []
-        if route_stop_times:
-            first_stops_by_trip = {}
-            for st in route_stop_times:
-                trip_id = st.get('trip_id')
-                if trip_id not in first_stops_by_trip:
-                    first_stops_by_trip[trip_id] = st
-                else:
-                    if int(st.get('stop_sequence', 999)) < int(first_stops_by_trip[trip_id].get('stop_sequence', 999)):
-                        first_stops_by_trip[trip_id] = st
-            
-            first_stop_times = []
-            for st in first_stops_by_trip.values():
-                dep_sec = parse_time_to_seconds(st.get('departure_time', ''))
-                if dep_sec:
-                    first_stop_times.append(dep_sec)
-            
-            first_stop_times.sort()
-            for i in range(1, len(first_stop_times)):
-                headway = first_stop_times[i] - first_stop_times[i-1]
-                if headway > 0:
-                    first_stop_headways.append(headway / 60)  # Convert to minutes
+        for i in range(1, len(first_stop_times)):
+            headway = first_stop_times[i] - first_stop_times[i-1]
+            if headway > 0:
+                first_stop_headways.append(headway / 60)  # Convert to minutes
         
         avg_headway = sum(first_stop_headways) / len(first_stop_headways) if first_stop_headways else None
         
+        # Get unique stops for this route (using set for O(1) lookups)
+        unique_stop_ids = set()
+        for trip_id in route_trip_ids:
+            trip_stop_times = stop_times_by_trip.get(trip_id, [])
+            for st in trip_stop_times:
+                stop_id = st.get('stop_id', '').strip() if st.get('stop_id') else ''
+                if stop_id:
+                    unique_stop_ids.add(stop_id)
+        
         return jsonify({
             'route': route,
-            'total_trips': len(route_trips),
+            'total_trips': total_trips,
             'trips': trips_with_details,
             'avg_headway_minutes': round(avg_headway, 2) if avg_headway else None,
-            'total_stops': len(set(st.get('stop_id') for st in route_stop_times))
+            'total_stops': len(unique_stop_ids)
         })
     except Exception as e:
+        import traceback
         print(f"Error getting route details for {route_id}: {e}")
+        traceback.print_exc()
         return jsonify({'error': f'Error loading route details: {str(e)}'}), 500
 
 @app.route('/api/routes/<route_id>/stats')
