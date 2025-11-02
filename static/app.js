@@ -8,7 +8,7 @@ let stopsData = [];
 let routesData = [];
 let allStops = [];
 let currentStopMarker = null;
-let mapViewMode = 'stops'; // 'stops', 'routes', or 'both'
+let mapViewMode = 'routes'; // 'stops', 'routes', or 'both'
 let selectedRoutes = [];
 let routePathsLoaded = false; // Track if routes have been loaded
 
@@ -1169,10 +1169,22 @@ async function init() {
         console.error('Error loading routes for filter:', error);
     }
     
+    // Load routes on initialization if in routes mode
+    if (mapViewMode === 'routes' || mapViewMode === 'both') {
+        setTimeout(() => {
+            loadRoutePaths().then(() => {
+                console.log('Default routes loaded');
+                updateDetailsPanelForViewMode();
+            }).catch((error) => {
+                console.error('Failed to load default routes:', error);
+            });
+        }, 500);
+    }
+    
     // Load stops after routes (for better marker colors)
     setTimeout(() => {
         loadStops();
-        // Update details panel after stops load (default view is stops)
+        // Update details panel after stops load (if in stops or both mode)
         setTimeout(() => {
             if (mapViewMode === 'stops' || mapViewMode === 'both') {
                 updateDetailsPanelForViewMode();
