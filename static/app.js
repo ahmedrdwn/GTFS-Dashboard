@@ -858,12 +858,13 @@ function handleMapViewToggle(event) {
 // Handle route selection
 function handleRouteSelection(event) {
     const options = Array.from(event.target.selectedOptions);
-    selectedRoutes = options.map(opt => opt.value);
+    const selectedValues = options.map(opt => opt.value);
     
-    console.log('Route selection changed:', selectedRoutes);
+    console.log('Route selection changed:', selectedValues);
     
-    // If 'all' is selected, clear other selections and show all routes
-    if (selectedRoutes.includes('all')) {
+    // If 'all' is selected or nothing is selected, show global KPIs
+    if (selectedValues.includes('all') || selectedValues.length === 0 || 
+        (selectedValues.length === 1 && selectedValues[0] === 'all')) {
         selectedRoutes = ['all'];
         // Update UI to show only 'all' selected
         const routeSelector = document.getElementById('route-selector');
@@ -873,16 +874,24 @@ function handleRouteSelection(event) {
             });
         }
         // Restore global KPIs
+        console.log('Showing global KPIs (all routes)');
         loadKPIs();
-    } else if (selectedRoutes.length === 1 && selectedRoutes[0] !== 'all') {
-        // Single route selected - show route-specific KPIs
-        loadRouteKPIs(selectedRoutes[0]);
     } else {
-        // Multiple routes selected - show aggregated or first route
-        if (selectedRoutes.length > 0) {
+        // Filter out 'all' if present with other selections
+        selectedRoutes = selectedValues.filter(v => v !== 'all');
+        
+        if (selectedRoutes.length === 1) {
+            // Single route selected - show route-specific KPIs
+            console.log(`Showing route-specific KPIs for: ${selectedRoutes[0]}`);
+            loadRouteKPIs(selectedRoutes[0]);
+        } else if (selectedRoutes.length > 1) {
+            // Multiple routes selected - show first route's KPIs
+            console.log(`Showing route-specific KPIs for first route: ${selectedRoutes[0]}`);
             loadRouteKPIs(selectedRoutes[0]);
         } else {
-            loadKPIs(); // Default to global if no selection
+            // Fallback: show global KPIs
+            console.log('No valid route selection, showing global KPIs');
+            loadKPIs();
         }
     }
     
