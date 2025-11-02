@@ -223,8 +223,14 @@ async function loadRoutesForHome() {
             }
         });
         
-        // Initialize selectedRoutes to ['all'] by default
+        // Initialize selectedRoutes to ['all'] by default and ensure UI reflects this
         selectedRoutes = ['all'];
+        if (routeSelector && routeSelector.options.length > 0) {
+            // Ensure 'all' option is selected by default
+            Array.from(routeSelector.options).forEach(opt => {
+                opt.selected = (opt.value === 'all');
+            });
+        }
         
         // Add event listeners
         if (routeFilter) {
