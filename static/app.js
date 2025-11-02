@@ -405,10 +405,20 @@ async function loadRoutePaths() {
                 });
             });
             
+            // Add click handler to show route details in panel
+            polyline.on('click', function() {
+                showRouteDetailsInPanel(routePath.route_id);
+            });
+            
             routePolylines.push(polyline);
         });
         
             console.log(`Displayed ${routePolylines.length} route polylines with different colors`);
+        
+        // Update details panel after loading routes
+        if (mapViewMode === 'routes') {
+            updateDetailsPanelForViewMode();
+        }
         
         // Fit map to show all routes if needed
         if (routePolylines.length > 0 && mapViewMode === 'routes') {
@@ -455,6 +465,167 @@ async function loadRoutePaths() {
         alert('Error loading routes: ' + error.message);
     }
 }
+
+// Update details panel based on current view mode
+async function updateDetailsPanelForViewMode() {
+    const panel = document.getElementById('details-panel');
+    const panelTitle = document.getElementById('panel-title');
+    const panelContent = document.getElementById('panel-content');
+    
+    if (!panel || !panelTitle || !panelContent) return;
+    
+    panelContent.innerHTML = '<div class="loading">Loading details...</div>';
+    panel.style.transform = 'translateX(0)'; // Show panel
+    
+    if (mapViewMode === 'stops' || mapViewMode === 'both') {
+        // Show all stops
+        panelTitle.textContent = 'All Stops';
+        try {
+            let html = '<div class="stops-summary"><h4>📍 All Stops</h4>';
+            
+            if (stopsData && stopsData.length > 0) {
+                html += `<p><strong>Total Stops:</strong> ${stopsData.length}</p>`;
+                html += '<div class="stops-list" style="max-height: 400px; overflow-y: auto;">';
+                
+                stopsData.slice(0, 100).forEach((stop, index) => {
+                    html += `
+                        <div class="stop-item" style="padding: 10px; border-bottom: 1px solid #e0e0e0; cursor: pointer;" 
+                             onclick="showStopDetailsFromPopup('${stop.stop_id}')">
+                            <div style="font-weight: 600; color: #7A003C;">${stop.stop_name || stop.stop_id}</div>
+                            <div style="font-size: 0.85em; color: #666;">ID: ${stop.stop_id}</div>
+                            ${stop.stop_desc ? `<div style="font-size: 0.85em; color: #888;">${stop.stop_desc}</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                if (stopsData.length > 100) {
+                    html += `<div style="padding: 10px; text-align: center; color: #888;">... and ${stopsData.length - 100} more stops. Click on a marker to see details.</div>`;
+                }
+                
+                html += '</div>';
+            } else {
+                html += '<p class="placeholder">No stops loaded. Upload a GTFS dataset first.</p>';
+            }
+            
+            html += '</div>';
+            panelContent.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading stops summary:', error);
+            panelContent.innerHTML = '<div class="error-message">Error loading stops.</div>';
+        }
+    } else if (mapViewMode === 'routes') {
+        // Show all routes
+        panelTitle.textContent = 'All Routes';
+        try {
+            let html = '<div class="routes-summary"><h4>🛣️ All Routes</h4>';
+            
+            if (routesData && routesData.length > 0) {
+                html += `<p><strong>Total Routes:</strong> ${routesData.length}</p>`;
+                html += '<div class="routes-list" style="max-height: 400px; overflow-y: auto;">';
+                
+                routesData.slice(0, 100).forEach((route) => {
+                    const routeColor = route.route_color ? `#${route.route_color}` : '#7A003C';
+                    const routeName = route.route_short_name || route.route_id;
+                    const routeLongName = route.route_long_name || '';
+                    
+                    html += `
+                        <div class="route-item" style="padding: 10px; border-bottom: 1px solid #e0e0e0; border-left: 4px solid ${routeColor}; cursor: pointer;" 
+                             onclick="showRouteDetailsInPanel('${route.route_id}')">
+                            <div style="font-weight: 600; color: ${routeColor}; display: flex; align-items: center; gap: 8px;">
+                                <span style="background: ${routeColor}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.9em;">${routeName}</span>
+                                <span>${routeLongName || route.route_id}</span>
+                            </div>
+                            <div style="font-size: 0.85em; color: #666; margin-top: 4px;">ID: ${route.route_id}</div>
+                        </div>
+                    `;
+                });
+                
+                if (routesData.length > 100) {
+                    html += `<div style="padding: 10px; text-align: center; color: #888;">... and ${routesData.length - 100} more routes.</div>`;
+                }
+                
+                html += '</div>';
+            } else {
+                html += '<p class="placeholder">No routes loaded. Upload a GTFS dataset first.</p>';
+            }
+            
+            html += '</div>';
+            panelContent.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading routes summary:', error);
+            panelContent.innerHTML = '<div class="error-message">Error loading routes.</div>';
+        }
+    }
+}
+
+// Show route details in panel (when route is clicked)
+async function showRouteDetailsInPanel(routeId) {
+    const panel = document.getElementById('details-panel');
+    const panelTitle = document.getElementById('panel-title');
+    const panelContent = document.getElementById('panel-content');
+    
+    panelContent.innerHTML = '<div class="loading">Loading route details...</div>';
+    panel.style.transform = 'translateX(0)';
+    
+    try {
+        const [detailsResponse, stopsResponse] = await Promise.all([
+            fetch(`/api/routes/${routeId}/details`),
+            fetch(`/api/routes/${routeId}/stops`)
+        ]);
+        
+        const details = await detailsResponse.json();
+        const stops = await stopsResponse.json();
+        
+        const route = details.route;
+        const routeColor = route.route_color ? `#${route.route_color}` : '#7A003C';
+        const routeTextColor = route.route_text_color ? `#${route.route_text_color}` : '#ffffff';
+        
+        panelTitle.innerHTML = `
+            <span style="background: ${routeColor}; color: ${routeTextColor}; padding: 4px 12px; border-radius: 4px; font-size: 0.9em; margin-right: 8px;">
+                ${route.route_short_name || route.route_id}
+            </span>
+            ${route.route_long_name || 'Route Details'}
+        `;
+        
+        let html = `
+            <div class="route-info">
+                <h4>🛣️ Route Information</h4>
+                <div class="info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                    <div><strong>Route ID:</strong><br>${route.route_id}</div>
+                    <div><strong>Total Trips:</strong><br>${details.total_trips}</div>
+                    <div><strong>Total Stops:</strong><br>${details.total_stops}</div>
+                    ${details.avg_headway_minutes ? `<div><strong>Avg Headway:</strong><br>${details.avg_headway_minutes} min</div>` : ''}
+                </div>
+                
+                <h4 style="margin-top: 20px;">📍 Stops on This Route (${stops.length})</h4>
+                <div class="stops-list" style="max-height: 300px; overflow-y: auto;">
+        `;
+        
+        stops.forEach((stop, index) => {
+            html += `
+                <div class="stop-item" style="padding: 8px; border-bottom: 1px solid #e0e0e0; cursor: pointer;" 
+                     onclick="showStopDetailsFromPopup('${stop.stop_id}')">
+                    <span style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; margin-right: 8px; font-weight: 600;">${index + 1}</span>
+                    <span style="font-weight: 600;">${stop.stop_name || stop.stop_id}</span>
+                    <div style="font-size: 0.85em; color: #666; margin-left: 24px;">ID: ${stop.stop_id}</div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        panelContent.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading route details:', error);
+        panelContent.innerHTML = '<div class="error-message">Error loading route details.</div>';
+    }
+}
+
+// Make function globally accessible
+window.showRouteDetailsInPanel = showRouteDetailsInPanel;
 
 // Create markers for stops
 function updateMapMarkers() {
@@ -551,6 +722,11 @@ function updateMapMarkers() {
     }
     
     hideMapLoading();
+    
+    // Update details panel after loading stops
+    if (mapViewMode === 'stops' || mapViewMode === 'both') {
+        updateDetailsPanelForViewMode();
+    }
 }
 
 // Handle map view toggle
@@ -576,6 +752,9 @@ function handleMapViewToggle(event) {
         markers.forEach(marker => map.removeLayer(marker));
         markers = [];
     }
+    
+    // Update details panel based on view mode
+    updateDetailsPanelForViewMode();
 }
 
 // Handle route selection
@@ -798,6 +977,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 clearRoutePolylines();
                 updateMapMarkers();
+                updateDetailsPanelForViewMode();
                 resetBtn.textContent = 'Reset View';
                 resetBtn.disabled = false;
             }, 300);
@@ -932,6 +1112,12 @@ async function init() {
     // Load stops after routes (for better marker colors)
     setTimeout(() => {
         loadStops();
+        // Update details panel after stops load (default view is stops)
+        setTimeout(() => {
+            if (mapViewMode === 'stops' || mapViewMode === 'both') {
+                updateDetailsPanelForViewMode();
+            }
+        }, 500);
     }, 500);
     
     console.log('App initialized');

@@ -25,11 +25,29 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
-    'connect_args': {'check_same_thread': False, 'timeout': 20}
+    'connect_args': {'check_same_thread': False, 'timeout': 30}
 }
 
 # Initialize database
 db.init_app(app)
+
+# Helper function for database operations with retry
+def db_operation_with_retry(operation, max_retries=3, retry_delay=0.1):
+    """Execute database operation with retry logic for handling locks"""
+    import time
+    for attempt in range(max_retries):
+        try:
+            with app.app_context():
+                result = operation()
+                db.session.commit()
+                return result
+        except Exception as e:
+            db.session.rollback()
+            if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                time.sleep(retry_delay * (attempt + 1))
+                continue
+            raise
+    raise Exception('Database operation failed after retries')
 
 # Path to GTFS files
 GTFS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -630,9 +648,9 @@ def get_all_route_paths():
             for st in route_stop_times:
                 trip_id = st.get('trip_id', '').strip() if st.get('trip_id') else ''
                 if trip_id:
-                    if trip_id not in trip_paths:
-                        trip_paths[trip_id] = []
-                    trip_paths[trip_id].append(st)
+                if trip_id not in trip_paths:
+                    trip_paths[trip_id] = []
+                trip_paths[trip_id].append(st)
             
             # Sort each trip's stops by stop_sequence
             for trip_id in trip_paths:
@@ -896,7 +914,7 @@ def upload_gtfs():
                         break
                 if not found:
                     missing_files.append(req_file)
-        
+            
         if missing_files:
             shutil.rmtree(temp_dir)
             return jsonify({'error': 'Missing required GTFS files', 'missing': missing_files}), 400
@@ -969,18 +987,29 @@ def upload_gtfs():
             if routes_file:
                 try:
                     print(f"  Storing {routes_count} routes...")
-                    with app.app_context():
-                        route_rows = []
-                        with open(routes_file, 'r', encoding='utf-8-sig') as f:
-                            reader = csv.DictReader(f)
-                            for row in reader:
-                                parsed = parse_gtfs_to_db_rows([row], upload_id, 'routes')[0]
-                                route_rows.append(parsed)
-                        if route_rows:
-                            db.session.bulk_insert_mappings(Route, route_rows)
-                            db.session.commit()
-                            db.session.close()
-                    print(f"  Stored {len(route_rows)} routes")
+                    import time
+                    max_retries = 5
+                    for attempt in range(max_retries):
+                        try:
+                            with app.app_context():
+                                route_rows = []
+                                with open(routes_file, 'r', encoding='utf-8-sig') as f:
+                                    reader = csv.DictReader(f)
+                                    for row in reader:
+                                        parsed = parse_gtfs_to_db_rows([row], upload_id, 'routes')[0]
+                                        route_rows.append(parsed)
+                                if route_rows:
+                                    db.session.bulk_insert_mappings(Route, route_rows)
+                                    db.session.commit()
+                                    db.session.close()
+                                print(f"  Stored {len(route_rows)} routes")
+                                break
+                        except Exception as e:
+                            db.session.rollback()
+                            if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                                time.sleep(0.2 * (attempt + 1))
+                                continue
+                            raise
                 except Exception as e:
                     print(f"  Error storing routes: {e}")
         
@@ -993,31 +1022,51 @@ def upload_gtfs():
             if stops_file:
                 try:
                     print(f"  Storing {stops_count} stops...")
-                    with app.app_context():
-                        stop_rows = []
-                        with open(stops_file, 'r', encoding='utf-8-sig') as f:
-                            reader = csv.DictReader(f)
-                            for row in reader:
-                                parsed = parse_gtfs_to_db_rows([row], upload_id, 'stops')[0]
-                                stop_rows.append(parsed)
-                        if stop_rows:
-                            db.session.bulk_insert_mappings(Stop, stop_rows)
-                            db.session.commit()
-                            db.session.close()
-                    print(f"  Stored {len(stop_rows)} stops")
+                    import time
+                    max_retries = 5
+                    for attempt in range(max_retries):
+                        try:
+                            with app.app_context():
+                                stop_rows = []
+                                with open(stops_file, 'r', encoding='utf-8-sig') as f:
+                                    reader = csv.DictReader(f)
+                                    for row in reader:
+                                        parsed = parse_gtfs_to_db_rows([row], upload_id, 'stops')[0]
+                                        stop_rows.append(parsed)
+                                if stop_rows:
+                                    db.session.bulk_insert_mappings(Stop, stop_rows)
+                                    db.session.commit()
+                                    db.session.close()
+                                print(f"  Stored {len(stop_rows)} stops")
+                                break
+                        except Exception as e:
+                            db.session.rollback()
+                            if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                                time.sleep(0.2 * (attempt + 1))
+                                continue
+                            raise
                 except Exception as e:
                     print(f"  Error storing stops: {e}")
         
         # Update status
-        try:
-            with app.app_context():
-                upload = GTFSUpload.query.get(upload_id)
-                if upload:
-                    upload.status = 'Parsed'
-                    db.session.commit()
-                    db.session.close()
-        except Exception as e:
-            print(f"  Error updating status: {e}")
+        import time
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                with app.app_context():
+                    upload = GTFSUpload.query.get(upload_id)
+                    if upload:
+                        upload.status = 'Parsed'
+                        db.session.commit()
+                        db.session.close()
+                    break
+            except Exception as e:
+                db.session.rollback()
+                if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                    time.sleep(0.2 * (attempt + 1))
+                    continue
+                print(f"  Error updating status: {e}")
+                break
         
         # Generate preview data (only first 5 rows of each file for display)
         print(f"[{time.strftime('%H:%M:%S')}] Generating preview data...")
@@ -1080,22 +1129,40 @@ def upload_gtfs():
 @app.route('/api/gtfs-uploads', methods=['GET'])
 def get_gtfs_uploads():
     """Get list of all GTFS uploads"""
-    try:
-        with app.app_context():
-            uploads = GTFSUpload.query.order_by(GTFSUpload.upload_date.desc()).all()
-            return jsonify([upload.to_dict() for upload in uploads])
-    except Exception as e:
-        return jsonify({'error': f'Error loading uploads: {str(e)}'}), 500
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with app.app_context():
+                uploads = GTFSUpload.query.order_by(GTFSUpload.upload_date.desc()).all()
+                result = [upload.to_dict() for upload in uploads]
+                db.session.close()
+                return jsonify(result)
+        except Exception as e:
+            if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                time.sleep(0.1 * (attempt + 1))
+                continue
+            print(f"Error loading uploads: {e}")
+            return jsonify({'error': f'Error loading uploads: {str(e)}'}), 500
 
 @app.route('/api/gtfs-uploads/<int:upload_id>', methods=['GET'])
 def get_gtfs_upload(upload_id):
     """Get details for a specific upload"""
-    try:
-        with app.app_context():
-            upload = GTFSUpload.query.get_or_404(upload_id)
-            return jsonify(upload.to_dict())
-    except Exception as e:
-        return jsonify({'error': f'Error loading upload: {str(e)}'}), 500
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with app.app_context():
+                upload = GTFSUpload.query.get_or_404(upload_id)
+                result = upload.to_dict()
+                db.session.close()
+                return jsonify(result)
+        except Exception as e:
+            if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                time.sleep(0.1 * (attempt + 1))
+                continue
+            print(f"Error loading upload: {e}")
+            return jsonify({'error': f'Error loading upload: {str(e)}'}), 500
 
 @app.route('/api/gtfs-uploads/<int:upload_id>/reload', methods=['POST'])
 def reload_gtfs_upload(upload_id):
@@ -1186,21 +1253,30 @@ def reload_gtfs_upload(upload_id):
 @app.route('/api/gtfs-uploads/<int:upload_id>', methods=['DELETE'])
 def delete_gtfs_upload(upload_id):
     """Delete a GTFS upload and all associated data"""
-    try:
-        with app.app_context():
-            upload = GTFSUpload.query.get_or_404(upload_id)
-            upload_name = upload.name
-            
-            # Delete upload (cascades to related records)
-            db.session.delete(upload)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': f'Dataset "{upload_name}" deleted successfully'
-            })
-    except Exception as e:
-        return jsonify({'error': f'Error deleting dataset: {str(e)}'}), 500
+    import time
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            with app.app_context():
+                upload = GTFSUpload.query.get_or_404(upload_id)
+                upload_name = upload.name
+                
+                # Delete upload (cascades to related records)
+                db.session.delete(upload)
+                db.session.commit()
+                db.session.close()
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'Dataset "{upload_name}" deleted successfully'
+                })
+        except Exception as e:
+            db.session.rollback()
+            if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                time.sleep(0.2 * (attempt + 1))
+                continue
+            print(f"Error deleting upload: {e}")
+            return jsonify({'error': f'Error deleting dataset: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Create database tables if they don't exist
