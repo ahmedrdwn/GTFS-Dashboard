@@ -20,10 +20,6 @@
                 <span class="nav-icon">🏠</span>
                 <span class="nav-text">Home</span>
             </button>
-            <button class="nav-btn" data-page="routes">
-                <span class="nav-icon">🛣️</span>
-                <span class="nav-text">Routes</span>
-            </button>
             <button class="nav-btn" data-page="upload">
                 <span class="nav-icon">📤</span>
                 <span class="nav-text">Upload GTFS</span>
@@ -31,10 +27,6 @@
             <button class="nav-btn" data-page="archive">
                 <span class="nav-icon">📚</span>
                 <span class="nav-text">Archive</span>
-            </button>
-            <button class="nav-btn" data-page="editor">
-                <span class="nav-icon">✏️</span>
-                <span class="nav-text">Map Editor</span>
             </button>
         </nav>
 
@@ -114,39 +106,6 @@
                     </div>
                 </div>
             </section>
-            </div>
-
-            <!-- Routes Page -->
-            <div id="page-routes" class="page">
-                <div class="routes-header">
-                    <h2>All Routes</h2>
-                    <div class="routes-filters">
-                        <input type="text" id="route-search" placeholder="Search by route name or ID..." class="search-input">
-                        <select id="service-filter" class="filter-select">
-                            <option value="all">All Services</option>
-                            <option value="WEEKDAY">Weekday</option>
-                            <option value="WEEKEND">Weekend</option>
-                            <option value="DAILY">Daily</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div id="routes-grid" class="routes-grid">
-                    <div class="loading">Loading routes...</div>
-                </div>
-            </div>
-
-            <!-- Route Detail Modal -->
-            <div id="route-detail-modal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 id="modal-route-title">Route Details</h2>
-                        <button class="modal-close" id="close-modal">×</button>
-                    </div>
-                    <div class="modal-body" id="modal-body">
-                        <div class="loading">Loading route details...</div>
-                    </div>
-                </div>
             </div>
 
             <!-- Upload GTFS Page -->
@@ -348,93 +307,13 @@
                 </div>
             </div>
 
-            <!-- Routes Map Editor Page -->
-            <div id="page-editor" class="page">
-                <div class="editor-page">
-                    <h2>✏️ Routes Map Editor</h2>
-                    <p class="page-description">Edit route details and geometry on an interactive map</p>
-                    
-                    <!-- Editor Controls -->
-                    <section class="editor-controls">
-                        <div class="editor-toolbar">
-                            <div class="toolbar-group">
-                                <label for="editor-route-select">Select Route:</label>
-                                <select id="editor-route-select" class="control-select">
-                                    <option value="">Select a route...</option>
-                                </select>
-                            </div>
-                            <div class="toolbar-group">
-                                <button id="edit-mode-btn" class="btn-secondary" disabled>Edit Mode</button>
-                                <button id="save-route-btn" class="btn-primary" disabled>Save Changes</button>
-                                <button id="cancel-edit-btn" class="btn-cancel" disabled>Cancel</button>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- Route Info Cards -->
-                    <section class="editor-kpis" id="editor-kpis" style="display: none;">
-                        <div class="kpi-grid">
-                            <div class="kpi-card">
-                                <div class="kpi-icon">🛣️</div>
-                                <div class="kpi-value" id="editor-route-name">-</div>
-                                <div class="kpi-label">Selected Route</div>
-                            </div>
-                            <div class="kpi-card">
-                                <div class="kpi-icon">📍</div>
-                                <div class="kpi-value" id="editor-stop-count">-</div>
-                                <div class="kpi-label">Stops on Route</div>
-                            </div>
-                            <div class="kpi-card">
-                                <div class="kpi-icon">📏</div>
-                                <div class="kpi-value" id="editor-distance">-</div>
-                                <div class="kpi-label">Distance (km)</div>
-                            </div>
-                            <div class="kpi-card">
-                                <div class="kpi-icon">🚏</div>
-                                <div class="kpi-value" id="editor-trip-count">-</div>
-                                <div class="kpi-label">Trips</div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- Editor Layout -->
-                    <section class="editor-layout">
-                        <!-- Map Container -->
-                        <div class="editor-map-container">
-                            <div id="editor-map" class="editor-map"></div>
-                            <div class="map-controls">
-                                <button id="toggle-stops-btn" class="control-btn active">
-                                    <span class="btn-icon">📍</span>
-                                    <span>Show Stops</span>
-                                </button>
-                                <button id="toggle-routes-btn" class="control-btn active">
-                                    <span class="btn-icon">🛣️</span>
-                                    <span>Show Routes</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Route Details Panel -->
-                        <div class="editor-panel" id="editor-panel">
-                            <div class="panel-header">
-                                <h3 id="panel-route-title">Route Details</h3>
-                            </div>
-                            <div class="panel-content" id="editor-panel-content">
-                                <p class="placeholder">Select a route to view and edit details</p>
-                            </div>
-                        </div>
-                    </section>
-                </div>
-            </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/static/app.js"></script>
-    <script src="/static/routes.js"></script>
     <script src="/static/upload.js"></script>
     <script src="/static/archive.js"></script>
-    <script src="/static/editor.js"></script>
 </body>
 </html>
 
