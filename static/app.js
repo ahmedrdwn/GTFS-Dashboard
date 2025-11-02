@@ -670,7 +670,7 @@ async function showStopDetailsInPanel(stopId) {
                 <h3>Upcoming Departures (${data.departures.length})</h3>
                 ${data.departures.slice(0, 10).map(dep => `
                     <div class="detail-item">
-                        <strong>Route:</strong> ${dep.route_short_name || dep.route_id || 'N/A'}<br>
+                        <strong>Route:</strong> ${(dep.route_short_name && dep.route_short_name.trim()) || (dep.route_long_name && dep.route_long_name.trim()) || dep.route_id || 'N/A'}<br>
                         <strong>Time:</strong> ${dep.departure_time || 'N/A'}<br>
                         <strong>Trip:</strong> ${dep.trip_id || 'N/A'}
                     </div>
