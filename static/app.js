@@ -44,14 +44,23 @@ function setupNavigation() {
             e.preventDefault();
             const targetPage = button.getAttribute('data-page');
             
-            if (!targetPage) return;
+            if (!targetPage) {
+                console.error('No data-page attribute found on button');
+                return;
+            }
+            
+            console.log(`Navigating to page: ${targetPage}`);
             
             // Update active nav button
-            navButtons.forEach(btn => btn.classList.remove('active'));
+            navButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.disabled = true; // Prevent rapid clicking
+            });
             button.classList.add('active');
             
             // Hide all pages
-            document.querySelectorAll('.page').forEach(page => {
+            const allPages = document.querySelectorAll('.page');
+            allPages.forEach(page => {
                 page.classList.remove('active');
                 page.style.display = 'none';
             });
@@ -63,9 +72,20 @@ function setupNavigation() {
                 targetPageElement.classList.add('active');
                 
                 // Initialize page-specific functionality
-                await initializePage(targetPage);
+                try {
+                    await initializePage(targetPage);
+                } catch (error) {
+                    console.error(`Error initializing page ${targetPage}:`, error);
+                }
+                
+                // Re-enable buttons
+                setTimeout(() => {
+                    navButtons.forEach(btn => btn.disabled = false);
+                }, 300);
+                
             } else {
                 console.error(`Page element not found: page-${targetPage}`);
+                navButtons.forEach(btn => btn.disabled = false);
             }
         });
     });
