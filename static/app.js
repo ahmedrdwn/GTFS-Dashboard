@@ -1180,6 +1180,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reset selectedRoutes to ['all']
             selectedRoutes = ['all'];
             
+            // Restore global KPIs when resetting
+            loadKPIs();
+            
             stopsData = allStops;
             
             // Animate reset
