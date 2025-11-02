@@ -1368,6 +1368,10 @@ function setupNavigation() {
                 if (page.classList.contains('active')) {
                     page.style.opacity = '0';
                     page.style.transition = 'opacity 0.2s ease-out';
+                    // Set display to none after fade-out completes
+                    setTimeout(() => {
+                        page.style.display = 'none';
+                    }, 200);
                 }
                 page.classList.remove('active');
             });
