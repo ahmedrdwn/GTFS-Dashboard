@@ -295,6 +295,7 @@ async function loadRoutePaths() {
     
     // Only load if in routes or both mode
     if (mapViewMode !== 'routes' && mapViewMode !== 'both') {
+        console.log(`loadRoutePaths: Skipping - mapViewMode is '${mapViewMode}'`);
         return;
     }
     
@@ -302,13 +303,17 @@ async function loadRoutePaths() {
         console.log('Fetching route paths from /api/routes/paths...');
         const response = await fetch('/api/routes/paths');
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
         }
         
         const allPaths = await response.json();
         
         if (!allPaths || allPaths.length === 0) {
-            console.log('No route paths returned from API');
+            console.warn('No route paths returned from API');
+            const panelContent = document.getElementById('panel-content');
+            if (panelContent) {
+                panelContent.innerHTML = '<div class="error-message">No route paths available. Make sure GTFS data is loaded.</div>';
+            }
             return;
         }
         
