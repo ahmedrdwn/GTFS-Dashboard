@@ -308,7 +308,17 @@ async function loadRoutePaths() {
     
     try {
         console.log('Fetching route paths from /api/routes/paths...');
-        const response = await fetch('/api/routes/paths');
+        
+        // Add timeout to fetch request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
+        const response = await fetch('/api/routes/paths', {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
         }
@@ -1142,95 +1152,160 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Navigation functionality
+// Navigation functionality - Optimized with smooth transitions
 function setupNavigation() {
     const navButtons = document.querySelectorAll('.nav-btn');
     const pages = document.querySelectorAll('.page');
     
     navButtons.forEach(button => {
-        button.addEventListener('click', () => {
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
             const targetPage = button.getAttribute('data-page');
             
-            // Update active nav button
-            navButtons.forEach(btn => btn.classList.remove('active'));
+            // Prevent duplicate navigation
+            if (button.classList.contains('active') && targetPage === 'home') {
+                return;
+            }
+            
+            // Update active nav button with smooth transition
+            navButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.disabled = true; // Prevent rapid clicking
+            });
             button.classList.add('active');
             
-            // Show/hide pages
+            // Hide all pages with fade-out
             pages.forEach(page => {
+                if (page.classList.contains('active')) {
+                    page.style.opacity = '0';
+                    page.style.transition = 'opacity 0.2s ease-out';
+                }
                 page.classList.remove('active');
             });
             
-            const targetPageElement = document.getElementById(`page-${targetPage}`);
-            if (targetPageElement) {
-                targetPageElement.classList.add('active');
-            }
-            
-            // Initialize upload page if needed
-            if (targetPage === 'upload') {
-                if (typeof initUploadPage === 'function') {
-                    initUploadPage();
+            // Show target page with fade-in
+            setTimeout(() => {
+                const targetPageElement = document.getElementById(`page-${targetPage}`);
+                if (targetPageElement) {
+                    targetPageElement.classList.add('active');
+                    targetPageElement.style.opacity = '0';
+                    requestAnimationFrame(() => {
+                        targetPageElement.style.transition = 'opacity 0.3s ease-in';
+                        targetPageElement.style.opacity = '1';
+                    });
+                    
+                    // Initialize page-specific functions
+                    initializePage(targetPage);
                 }
-            }
-            
-            // Initialize archive page if needed
-            if (targetPage === 'archive') {
-                if (typeof initArchivePage === 'function') {
-                    initArchivePage();
-                }
-            }
-            
+                
+                // Re-enable buttons after transition
+                setTimeout(() => {
+                    navButtons.forEach(btn => btn.disabled = false);
+                }, 300);
+            }, 150);
         });
     });
 }
 
-// Initialize app
+// Centralized page initialization
+function initializePage(pageName) {
+    try {
+        switch(pageName) {
+            case 'home':
+                // Home page is already initialized in init()
+                break;
+            case 'upload':
+                if (typeof initUploadPage === 'function') {
+                    initUploadPage();
+                }
+                break;
+            case 'archive':
+                if (typeof initArchivePage === 'function') {
+                    initArchivePage();
+                }
+                break;
+            default:
+                console.log(`No initialization needed for page: ${pageName}`);
+        }
+    } catch (error) {
+        console.error(`Error initializing page ${pageName}:`, error);
+    }
+}
+
+// Initialize app - Optimized loading sequence
 async function init() {
     console.log('Initializing GTFS Dashboard...');
     
-    // Setup navigation first
-    setupNavigation();
-    
-    // Initialize home page
-    initMap();
-    
-    // Load KPIs
     try {
-        await loadKPIs();
-    } catch (error) {
-        console.error('Error loading KPIs:', error);
-    }
-    
-    // Load routes for home page filter
-    try {
-        await loadRoutesForHome();
-    } catch (error) {
-        console.error('Error loading routes for filter:', error);
-    }
-    
-    // Load routes on initialization if in routes mode
-    if (mapViewMode === 'routes' || mapViewMode === 'both') {
-        setTimeout(() => {
-            loadRoutePaths().then(() => {
-                console.log('Default routes loaded');
-                updateDetailsPanelForViewMode();
-            }).catch((error) => {
-                console.error('Failed to load default routes:', error);
+        // Setup navigation first
+        setupNavigation();
+        
+        // Initialize home page map
+        initMap();
+        
+        // Load data in parallel where possible
+        const [kpisResult, routesResult] = await Promise.allSettled([
+            loadKPIs(),
+            loadRoutesForHome()
+        ]);
+        
+        // Handle KPI loading errors
+        if (kpisResult.status === 'rejected') {
+            console.error('Error loading KPIs:', kpisResult.reason);
+            // Show error state in UI
+            const kpiElements = ['kpi-total-stops', 'kpi-total-routes', 'kpi-total-trips', 'kpi-avg-headway', 'kpi-avg-duration'];
+            kpiElements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = 'Error';
             });
-        }, 500);
-    }
-    
-    // Load stops after routes (for better marker colors)
-    setTimeout(() => {
-        loadStops();
-        // Update details panel after stops load (if in stops or both mode)
+        }
+        
+        // Handle routes loading errors
+        if (routesResult.status === 'rejected') {
+            console.error('Error loading routes for filter:', routesResult.reason);
+        }
+        
+        // Load routes on initialization if in routes mode
+        if (mapViewMode === 'routes' || mapViewMode === 'both') {
+            setTimeout(() => {
+                loadRoutePaths().then(() => {
+                    console.log('Default routes loaded');
+                    updateDetailsPanelForViewMode();
+                }).catch((error) => {
+                    console.error('Failed to load default routes:', error);
+                });
+            }, 300);
+        }
+        
+        // Load stops after routes (for better marker colors)
         setTimeout(() => {
-            if (mapViewMode === 'stops' || mapViewMode === 'both') {
-                updateDetailsPanelForViewMode();
-            }
-    }, 500);
-    }, 500);
-    
-    console.log('App initialized');
+            loadStops().then(() => {
+                // Update details panel after stops load (if in stops or both mode)
+                if (mapViewMode === 'stops' || mapViewMode === 'both') {
+                    updateDetailsPanelForViewMode();
+                }
+            }).catch((error) => {
+                console.error('Error loading stops:', error);
+            });
+        }, 300);
+        
+        console.log('App initialized successfully');
+    } catch (error) {
+        console.error('Critical error during initialization:', error);
+        // Show user-friendly error message
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #e74c3c;">
+                    <h2>⚠️ Initialization Error</h2>
+                    <p>There was an error initializing the application. Please refresh the page.</p>
+                    <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #7A003C; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        Refresh Page
+                    </button>
+                </div>
+            `;
+        }
+    }
 }
 
 // Start the app

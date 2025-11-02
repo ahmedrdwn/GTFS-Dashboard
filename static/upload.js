@@ -4,10 +4,31 @@ let uploadMap = null;
 let uploadedStops = [];
 let uploadStartTime = null;
 
-// Initialize upload page
+// Initialize upload page - Optimized with cleanup
 function initUploadPage() {
+    // Clean up any previous upload state
+    cleanupUploadPage();
+    
+    // Setup fresh event listeners
     setupFileUpload();
     resetUploadUI();
+}
+
+// Cleanup function to prevent memory leaks
+function cleanupUploadPage() {
+    // Clear any ongoing uploads
+    if (uploadMap) {
+        try {
+            uploadMap.remove();
+            uploadMap = null;
+        } catch (e) {
+            console.warn('Error cleaning up upload map:', e);
+        }
+    }
+    
+    // Reset upload state
+    uploadedStops = [];
+    uploadStartTime = null;
 }
 
 // Reset upload UI

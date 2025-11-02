@@ -3,10 +3,21 @@
 let allUploads = [];
 let filteredUploads = [];
 
-// Initialize archive page
+// Initialize archive page - Optimized with error handling
 function initArchivePage() {
-    setupArchiveEventListeners();
-    loadArchiveData();
+    try {
+        setupArchiveEventListeners();
+        loadArchiveData();
+    } catch (error) {
+        console.error('Error initializing archive page:', error);
+        showArchiveError('Error initializing archive page. Please refresh.');
+    }
+}
+
+// Cleanup function for archive page
+function cleanupArchivePage() {
+    allUploads = [];
+    filteredUploads = [];
 }
 
 // Setup event listeners
