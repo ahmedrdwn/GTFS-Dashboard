@@ -462,7 +462,7 @@ def get_route_details(route_id):
                 })
         
         # Calculate average headway for this route (optimized)
-        first_stops_by_trip = {}
+            first_stops_by_trip = {}
         for trip_id in route_trip_ids:
             trip_stop_times = stop_times_by_trip.get(trip_id, [])
             if not trip_stop_times:
@@ -475,18 +475,18 @@ def get_route_details(route_id):
                 continue
         
         # Calculate headways
-        first_stop_times = []
-        for st in first_stops_by_trip.values():
-            dep_sec = parse_time_to_seconds(st.get('departure_time', ''))
-            if dep_sec:
-                first_stop_times.append(dep_sec)
-        
-        first_stop_times.sort()
-        first_stop_headways = []
-        for i in range(1, len(first_stop_times)):
-            headway = first_stop_times[i] - first_stop_times[i-1]
-            if headway > 0:
-                first_stop_headways.append(headway / 60)  # Convert to minutes
+            first_stop_times = []
+            for st in first_stops_by_trip.values():
+                dep_sec = parse_time_to_seconds(st.get('departure_time', ''))
+                if dep_sec:
+                    first_stop_times.append(dep_sec)
+            
+            first_stop_times.sort()
+            first_stop_headways = []
+            for i in range(1, len(first_stop_times)):
+                headway = first_stop_times[i] - first_stop_times[i-1]
+                if headway > 0:
+                    first_stop_headways.append(headway / 60)  # Convert to minutes
         
         avg_headway = sum(first_stop_headways) / len(first_stop_headways) if first_stop_headways else None
         
