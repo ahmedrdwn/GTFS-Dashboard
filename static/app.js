@@ -234,7 +234,19 @@ async function loadRouteKPIs(routeId) {
         
         const data = await response.json();
         const route = data.route || {};
-        const routeName = route.route_short_name || route.route_id || 'Route';
+        
+        // Get route name - prefer short_name, then long_name, fallback to ID
+        let routeName = '';
+        if (route.route_short_name && route.route_short_name.trim()) {
+            routeName = route.route_short_name.trim();
+            if (route.route_long_name && route.route_long_name.trim()) {
+                routeName += ' - ' + route.route_long_name.trim();
+            }
+        } else if (route.route_long_name && route.route_long_name.trim()) {
+            routeName = route.route_long_name.trim();
+        } else {
+            routeName = route.route_id || 'Route'; // Fallback to ID if no name available
+        }
         
         // Calculate avg trip duration
         let avgDuration = '-';
@@ -282,19 +294,31 @@ async function loadRoutesForHome() {
         // Add routes to dropdowns
         routesData.forEach(route => {
             const routeId = route.route_id || '';
-            const routeName = route.route_short_name || route.route_long_name || routeId;
+            
+            // Get route name - prefer short_name, then long_name, fallback to ID
+            let routeName = '';
+            if (route.route_short_name && route.route_short_name.trim()) {
+                routeName = route.route_short_name.trim();
+                if (route.route_long_name && route.route_long_name.trim()) {
+                    routeName += ' - ' + route.route_long_name.trim();
+                }
+            } else if (route.route_long_name && route.route_long_name.trim()) {
+                routeName = route.route_long_name.trim();
+            } else {
+                routeName = routeId; // Fallback to ID if no name available
+            }
             
             if (routeFilter) {
                 const option = document.createElement('option');
                 option.value = routeId;
-                option.textContent = `${routeName} (${routeId})`;
+                option.textContent = routeName;
                 routeFilter.appendChild(option);
             }
             
             if (routeSelector) {
                 const option = document.createElement('option');
                 option.value = routeId;
-                option.textContent = `${routeName} (${routeId})`;
+                option.textContent = routeName;
                 routeSelector.appendChild(option);
             }
         });
@@ -397,8 +421,18 @@ async function loadRoutePaths() {
                 opacity: 0.8
             }).addTo(map);
             
-            // Add popup
-            const routeName = route.route_short_name || route.route_long_name || routeId;
+            // Add popup - format route name properly
+            let routeName = '';
+            if (route.route_short_name && route.route_short_name.trim()) {
+                routeName = route.route_short_name.trim();
+                if (route.route_long_name && route.route_long_name.trim()) {
+                    routeName += ' - ' + route.route_long_name.trim();
+                }
+            } else if (route.route_long_name && route.route_long_name.trim()) {
+                routeName = route.route_long_name.trim();
+            } else {
+                routeName = routeId; // Fallback to ID
+            }
             polyline.bindPopup(`<strong>Route:</strong> ${routeName}`);
             
             // Add click handler
@@ -454,7 +488,10 @@ async function loadStops() {
             
             const marker = L.marker([lat, lon]).addTo(map);
             
-            marker.bindPopup(`<strong>${stop.stop_name || 'Stop'}</strong><br>ID: ${stop.stop_id || 'N/A'}`);
+            // Format stop name - use stop_name from GTFS
+            const stopName = stop.stop_name || stop.stop_id || 'Stop';
+            const stopId = stop.stop_id || 'N/A';
+            marker.bindPopup(`<strong>${stopName}</strong><br>ID: ${stopId}`);
             
             marker.on('click', () => {
                 showStopDetailsInPanel(stop.stop_id);
@@ -493,9 +530,20 @@ async function updateDetailsPanelForViewMode() {
         // Show routes summary
         if (routesData.length > 0) {
             const html = routesData.slice(0, 20).map(route => {
-                const routeName = route.route_short_name || route.route_long_name || route.route_id;
+                // Format route name properly
+                let routeName = '';
+                if (route.route_short_name && route.route_short_name.trim()) {
+                    routeName = route.route_short_name.trim();
+                    if (route.route_long_name && route.route_long_name.trim()) {
+                        routeName += ' - ' + route.route_long_name.trim();
+                    }
+                } else if (route.route_long_name && route.route_long_name.trim()) {
+                    routeName = route.route_long_name.trim();
+                } else {
+                    routeName = route.route_id || 'Route';
+                }
                 return `<div class="detail-item" onclick="showRouteDetailsInPanel('${route.route_id}')">
-                    <strong>${routeName}</strong> (${route.route_id})
+                    <strong>${routeName}</strong>
                 </div>`;
             }).join('');
             panelContent.innerHTML = html || '<div>No routes found</div>';
@@ -509,8 +557,10 @@ async function updateDetailsPanelForViewMode() {
         // Show stops summary
         if (allStops.length > 0) {
             const html = allStops.slice(0, 20).map(stop => {
+                // Use stop_name from GTFS, fallback to stop_id
+                const stopName = stop.stop_name && stop.stop_name.trim() ? stop.stop_name.trim() : stop.stop_id;
                 return `<div class="detail-item" onclick="showStopDetailsInPanel('${stop.stop_id}')">
-                    <strong>${stop.stop_name || 'Stop'}</strong> (${stop.stop_id})
+                    <strong>${stopName}</strong>
                 </div>`;
             }).join('');
             panelContent.innerHTML = html || '<div>No stops found</div>';
@@ -540,7 +590,19 @@ async function showRouteDetailsInPanel(routeId) {
         
         const data = await response.json();
         const route = data.route || {};
-        const routeName = route.route_short_name || route.route_long_name || routeId;
+        
+        // Format route name properly
+        let routeName = '';
+        if (route.route_short_name && route.route_short_name.trim()) {
+            routeName = route.route_short_name.trim();
+            if (route.route_long_name && route.route_long_name.trim()) {
+                routeName += ' - ' + route.route_long_name.trim();
+            }
+        } else if (route.route_long_name && route.route_long_name.trim()) {
+            routeName = route.route_long_name.trim();
+        } else {
+            routeName = routeId || 'Route';
+        }
         
         panelTitle.textContent = `Route: ${routeName}`;
         
@@ -592,7 +654,9 @@ async function showStopDetailsInPanel(stopId) {
         const data = await response.json();
         const stop = data.stop || {};
         
-        panelTitle.textContent = `Stop: ${stop.stop_name || stopId}`;
+        // Use stop_name from GTFS, ensure it's displayed correctly
+        const stopName = (stop.stop_name && stop.stop_name.trim()) ? stop.stop_name.trim() : stopId;
+        panelTitle.textContent = `Stop: ${stopName}`;
         
         let html = `<div class="detail-section">
             <h3>Stop Information</h3>
