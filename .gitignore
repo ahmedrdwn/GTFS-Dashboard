@@ -29,6 +29,7 @@ instance/
 
 # Database
 *.db
+*.db-journal
 *.sqlite
 *.sqlite3
 gtfs_uploads.db
