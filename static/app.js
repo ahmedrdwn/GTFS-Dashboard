@@ -564,17 +564,54 @@ async function showRouteDetailsInPanel(routeId) {
     const panelTitle = document.getElementById('panel-title');
     const panelContent = document.getElementById('panel-content');
     
+    if (!panel || !panelTitle || !panelContent) {
+        console.error('Details panel elements not found');
+        return;
+    }
+    
+    if (!routeId || routeId === 'undefined' || routeId === '') {
+        console.error('Invalid route ID:', routeId);
+        panelContent.innerHTML = '<div class="error-message">Invalid route ID.</div>';
+        return;
+    }
+    
     panelContent.innerHTML = '<div class="loading">Loading route details...</div>';
     panel.style.transform = 'translateX(0)';
     
     try {
+        console.log(`Loading details for route: ${routeId}`);
         const [detailsResponse, stopsResponse] = await Promise.all([
-            fetch(`/api/routes/${routeId}/details`),
-            fetch(`/api/routes/${routeId}/stops`)
+            fetch(`/api/routes/${encodeURIComponent(routeId)}/details`),
+            fetch(`/api/routes/${encodeURIComponent(routeId)}/stops`)
         ]);
+        
+        if (!detailsResponse.ok) {
+            throw new Error(`Failed to fetch route details: ${detailsResponse.status} ${detailsResponse.statusText}`);
+        }
+        
+        if (!stopsResponse.ok) {
+            throw new Error(`Failed to fetch route stops: ${stopsResponse.status} ${stopsResponse.statusText}`);
+        }
         
         const details = await detailsResponse.json();
         const stops = await stopsResponse.json();
+        
+        console.log('Route details loaded:', details);
+        console.log('Route stops loaded:', stops?.length || 0);
+        
+        if (!details || details.error) {
+            throw new Error(details.error || 'Failed to load route details');
+        }
+        
+        // Validate response data
+        if (!details || !details.route) {
+            throw new Error('Invalid route details response - route data missing');
+        }
+        
+        if (!stops || !Array.isArray(stops)) {
+            console.warn('Stops data is not an array:', stops);
+            stops = [];
+        }
         
         const route = details.route;
         const routeColor = route.route_color ? `#${route.route_color}` : '#7A003C';
@@ -591,9 +628,9 @@ async function showRouteDetailsInPanel(routeId) {
             <div class="route-info">
                 <h4>🛣️ Route Information</h4>
                 <div class="info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-                    <div><strong>Route ID:</strong><br>${route.route_id}</div>
-                    <div><strong>Total Trips:</strong><br>${details.total_trips}</div>
-                    <div><strong>Total Stops:</strong><br>${details.total_stops}</div>
+                    <div><strong>Route ID:</strong><br>${route.route_id || 'N/A'}</div>
+                    <div><strong>Total Trips:</strong><br>${details.total_trips || 0}</div>
+                    <div><strong>Total Stops:</strong><br>${details.total_stops || stops.length || 0}</div>
                     ${details.avg_headway_minutes ? `<div><strong>Avg Headway:</strong><br>${details.avg_headway_minutes} min</div>` : ''}
                 </div>
                 
@@ -601,16 +638,20 @@ async function showRouteDetailsInPanel(routeId) {
                 <div class="stops-list" style="max-height: 300px; overflow-y: auto;">
         `;
         
-        stops.forEach((stop, index) => {
-            html += `
-                <div class="stop-item" style="padding: 8px; border-bottom: 1px solid #e0e0e0; cursor: pointer;" 
-                     onclick="showStopDetailsFromPopup('${stop.stop_id}')">
-                    <span style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; margin-right: 8px; font-weight: 600;">${index + 1}</span>
-                    <span style="font-weight: 600;">${stop.stop_name || stop.stop_id}</span>
-                    <div style="font-size: 0.85em; color: #666; margin-left: 24px;">ID: ${stop.stop_id}</div>
-                </div>
-            `;
-        });
+        if (stops.length > 0) {
+            stops.forEach((stop, index) => {
+                html += `
+                    <div class="stop-item" style="padding: 8px; border-bottom: 1px solid #e0e0e0; cursor: pointer;" 
+                         onclick="showStopDetailsFromPopup('${stop.stop_id}')">
+                        <span style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px; margin-right: 8px; font-weight: 600;">${index + 1}</span>
+                        <span style="font-weight: 600;">${stop.stop_name || stop.stop_id}</span>
+                        <div style="font-size: 0.85em; color: #666; margin-left: 24px;">ID: ${stop.stop_id}</div>
+                    </div>
+                `;
+            });
+        } else {
+            html += '<div style="padding: 20px; text-align: center; color: #888;">No stops found for this route.</div>';
+        }
         
         html += `
                 </div>
@@ -618,9 +659,11 @@ async function showRouteDetailsInPanel(routeId) {
         `;
         
         panelContent.innerHTML = html;
+        console.log('Route details displayed successfully');
     } catch (error) {
         console.error('Error loading route details:', error);
-        panelContent.innerHTML = '<div class="error-message">Error loading route details.</div>';
+        const errorMessage = error.message || 'Unknown error occurred';
+        panelContent.innerHTML = `<div class="error-message">Error loading route details: ${errorMessage}</div>`;
     }
 }
 

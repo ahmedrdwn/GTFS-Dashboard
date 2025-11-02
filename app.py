@@ -371,13 +371,21 @@ def get_route_details(route_id):
         stop_times = load_csv(os.path.join(GTFS_DIR, 'stop_times.txt'))
         stops_data = load_csv(os.path.join(GTFS_DIR, 'stops.txt'))
         
-        # Get route info
-        route = next((r for r in routes_data if r.get('route_id') == route_id), None)
-        if not route:
-            return jsonify({'error': 'Route not found'}), 404
+        # Strip whitespace from route_id for matching
+        route_id = route_id.strip() if route_id else ''
         
-        # Get all trips for this route
-        route_trips = [trip for trip in trips_data if trip.get('route_id') == route_id]
+        # Get route info (strip whitespace from route_id in data for comparison)
+        route = None
+        for r in routes_data:
+            if r.get('route_id', '').strip() == route_id:
+                route = r
+                break
+        
+        if not route:
+            return jsonify({'error': f'Route not found: {route_id}'}), 404
+        
+        # Get all trips for this route (strip whitespace for comparison)
+        route_trips = [trip for trip in trips_data if trip.get('route_id', '').strip() == route_id]
         
         # Calculate trip details
         trips_with_details = []
