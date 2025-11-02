@@ -254,31 +254,55 @@ async function loadStops() {
         console.log('Loading stops...');
         hideMapLoading();
         
-        // Add timeout to fetch request
+        // Add timeout to fetch request with better error handling
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        let timeoutId = null;
         
-        const response = await fetch('/api/stops', {
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error(`Failed to fetch stops: ${response.status}`);
+        try {
+            timeoutId = setTimeout(() => {
+                if (controller.signal && !controller.signal.aborted) {
+                    controller.abort();
+                    console.warn('Stops request timed out after 30 seconds');
+                }
+            }, 30000); // 30 second timeout
+            
+            const response = await fetch('/api/stops', {
+                signal: controller.signal
+            });
+            
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch stops: ${response.status}`);
+            }
+            allStops = await response.json();
+            stopsData = allStops;
+            console.log(`Loaded ${allStops.length} stops`);
+            
+            updateMapMarkers();
+        } catch (fetchError) {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
+            // Handle abort errors
+            if (fetchError.name === 'AbortError') {
+                throw new Error('Request timed out. Please try again.');
+            }
+            throw fetchError;
         }
-        allStops = await response.json();
-        stopsData = allStops;
-        console.log(`Loaded ${allStops.length} stops`);
-        
-        updateMapMarkers();
     } catch (error) {
         console.error('Error loading stops:', error);
         hideMapLoading();
         // Show error on map
         const mapDiv = document.getElementById('map');
         if (mapDiv) {
-            mapDiv.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Error loading stops. Please try refreshing the page.</div>';
+            const errorMsg = error.message || 'Unknown error';
+            mapDiv.innerHTML = `<div style="padding: 40px; text-align: center; color: #999;">Error loading stops: ${errorMsg}. Please try refreshing the page.</div>`;
         }
     }
 }
@@ -325,19 +349,30 @@ async function loadRoutePaths() {
     try {
         console.log('Fetching route paths from /api/routes/paths...');
         
-        // Add timeout to fetch request
+        // Add timeout to fetch request with better error handling
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        let timeoutId = null;
         
-        const response = await fetch('/api/routes/paths', {
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
-        }
+        try {
+            timeoutId = setTimeout(() => {
+                if (controller.signal && !controller.signal.aborted) {
+                    controller.abort();
+                    console.warn('Route paths request timed out after 30 seconds');
+                }
+            }, 30000); // 30 second timeout
+            
+            const response = await fetch('/api/routes/paths', {
+                signal: controller.signal
+            });
+            
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+            }
         
         const allPaths = await response.json();
         
@@ -986,6 +1021,35 @@ async function loadRouteKPIs(routeId) {
             animateValue(kpiElements['kpi-avg-duration'], currentDuration, avgDuration, 800);
         }, 100);
         
+        } catch (fetchError) {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
+            // Handle abort errors gracefully
+            if (fetchError.name === 'AbortError') {
+                console.warn('Route details request was aborted (likely timeout)');
+                // Show timeout message but still try to show global KPIs
+                const kpiElements = {
+                    'kpi-total-stops': document.getElementById('kpi-total-stops'),
+                    'kpi-total-routes': document.getElementById('kpi-total-routes'),
+                    'kpi-total-trips': document.getElementById('kpi-total-trips'),
+                    'kpi-avg-headway': document.getElementById('kpi-avg-headway'),
+                    'kpi-avg-duration': document.getElementById('kpi-avg-duration')
+                };
+                Object.values(kpiElements).forEach(el => {
+                    if (el) {
+                        el.textContent = 'Timeout';
+                        el.style.opacity = '1';
+                    }
+                });
+                // Fallback to global KPIs after a short delay
+                setTimeout(() => loadKPIs(), 2000);
+                return;
+            }
+            throw fetchError;
+        }
     } catch (error) {
         console.error('Error loading route KPIs:', error);
         // Show error state or fallback to global KPIs
