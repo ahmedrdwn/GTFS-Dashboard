@@ -872,12 +872,109 @@ function handleRouteSelection(event) {
                 opt.selected = (opt.value === 'all');
             });
         }
+        // Restore global KPIs
+        loadKPIs();
+    } else if (selectedRoutes.length === 1 && selectedRoutes[0] !== 'all') {
+        // Single route selected - show route-specific KPIs
+        loadRouteKPIs(selectedRoutes[0]);
+    } else {
+        // Multiple routes selected - show aggregated or first route
+        if (selectedRoutes.length > 0) {
+            loadRouteKPIs(selectedRoutes[0]);
+        } else {
+            loadKPIs(); // Default to global if no selection
+        }
     }
     
     // Reload route paths if in routes or both mode
     if (mapViewMode === 'routes' || mapViewMode === 'both') {
         console.log('Reloading route paths with selection:', selectedRoutes);
         loadRoutePaths();
+    }
+}
+
+// Load route-specific KPIs
+async function loadRouteKPIs(routeId) {
+    if (!routeId || routeId === 'all') {
+        loadKPIs();
+        return;
+    }
+    
+    try {
+        const kpiElements = {
+            'kpi-total-stops': document.getElementById('kpi-total-stops'),
+            'kpi-total-routes': document.getElementById('kpi-total-routes'),
+            'kpi-total-trips': document.getElementById('kpi-total-trips'),
+            'kpi-avg-headway': document.getElementById('kpi-avg-headway'),
+            'kpi-avg-duration': document.getElementById('kpi-avg-duration')
+        };
+        
+        // Show loading state
+        Object.values(kpiElements).forEach(el => {
+            if (el) {
+                el.textContent = '...';
+                el.style.opacity = '0.5';
+            }
+        });
+        
+        // Fetch route details
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
+        const response = await fetch(`/api/routes/${encodeURIComponent(routeId)}/details`, {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch route details: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data || !data.route) {
+            throw new Error('Invalid route data received');
+        }
+        
+        const route = data.route;
+        const routeName = route.route_short_name || route.route_id;
+        
+        // Update KPI cards with route-specific data
+        setTimeout(() => {
+            Object.values(kpiElements).forEach(el => {
+                if (el) el.style.opacity = '1';
+            });
+            
+            const currentStops = kpiElements['kpi-total-stops'].textContent;
+            const currentRoutes = kpiElements['kpi-total-routes'].textContent;
+            const currentTrips = kpiElements['kpi-total-trips'].textContent;
+            const currentHeadway = kpiElements['kpi-avg-headway'].textContent;
+            const currentDuration = kpiElements['kpi-avg-duration'].textContent;
+            
+            // Animate to route-specific values
+            animateValue(kpiElements['kpi-total-stops'], currentStops, data.total_stops || 0, 800);
+            animateValue(kpiElements['kpi-total-routes'], currentRoutes, routeName, 800); // Show route name instead of count
+            animateValue(kpiElements['kpi-total-trips'], currentTrips, data.total_trips || 0, 800);
+            animateValue(kpiElements['kpi-avg-headway'], currentHeadway, data.avg_headway_minutes || '-', 800);
+            
+            // Calculate average trip duration for this route
+            let avgDuration = '-';
+            if (data.trips && data.trips.length > 0) {
+                const durations = data.trips
+                    .map(t => t.duration_minutes)
+                    .filter(d => d !== null && d !== undefined);
+                if (durations.length > 0) {
+                    avgDuration = (durations.reduce((a, b) => a + b, 0) / durations.length).toFixed(2);
+                }
+            }
+            animateValue(kpiElements['kpi-avg-duration'], currentDuration, avgDuration, 800);
+        }, 100);
+        
+    } catch (error) {
+        console.error('Error loading route KPIs:', error);
+        // Show error state or fallback to global KPIs
+        loadKPIs();
     }
 }
 
