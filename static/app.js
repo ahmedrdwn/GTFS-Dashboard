@@ -200,6 +200,10 @@ async function loadRoutesForHome() {
             while (routeSelector.options.length > 1) {
                 routeSelector.remove(1);
             }
+            // Ensure 'all' is selected by default
+            if (routeSelector.options[0]) {
+                routeSelector.options[0].selected = true;
+            }
         }
         
         routesData.forEach(route => {
@@ -218,6 +222,9 @@ async function loadRoutesForHome() {
                 routeSelector.appendChild(selectorOption);
             }
         });
+        
+        // Initialize selectedRoutes to ['all'] by default
+        selectedRoutes = ['all'];
         
         // Add event listeners
         if (routeFilter) {
@@ -329,11 +336,22 @@ async function loadRoutePaths() {
             }
             
             // Determine if this route should be displayed
+            // Show route if:
+            // 1. No routes selected (show all by default)
+            // 2. 'all' is in selectedRoutes
+            // 3. This specific route_id is in selectedRoutes
             const shouldDisplay = 
-                (selectedRoutes.length === 0 || selectedRoutes.includes('all') || selectedRoutes.includes(routePath.route_id)) &&
+                (selectedRoutes.length === 0 || 
+                 selectedRoutes.includes('all') || 
+                 selectedRoutes.includes(routePath.route_id)) &&
                 (mapViewMode === 'routes' || mapViewMode === 'both');
             
-            if (!shouldDisplay) return;
+            if (!shouldDisplay) {
+                console.log(`Skipping route ${routePath.route_id} - not in selection`, selectedRoutes);
+                return;
+            }
+            
+            console.log(`Displaying route ${routePath.route_id}`);
             
             // Get route color (different color for each route)
             const routeColor = getRouteColor(route, index);
@@ -438,13 +456,13 @@ async function loadRoutePaths() {
             const bounds = L.latLngBounds([]);
             routePolylines.forEach(polyline => {
                 try {
-                    bounds.extend(polyline.getBounds());
+                bounds.extend(polyline.getBounds());
                 } catch (e) {
                     console.error('Error extending bounds:', e);
                 }
             });
             if (bounds.isValid()) {
-                map.fitBounds(bounds.pad(0.1));
+            map.fitBounds(bounds.pad(0.1));
                 console.log('Map fitted to show all routes');
             }
         } else if (routePolylines.length > 0 && mapViewMode === 'both') {
@@ -822,8 +840,23 @@ function handleRouteSelection(event) {
     const options = Array.from(event.target.selectedOptions);
     selectedRoutes = options.map(opt => opt.value);
     
+    console.log('Route selection changed:', selectedRoutes);
+    
+    // If 'all' is selected, clear other selections and show all routes
+    if (selectedRoutes.includes('all')) {
+        selectedRoutes = ['all'];
+        // Update UI to show only 'all' selected
+        const routeSelector = document.getElementById('route-selector');
+        if (routeSelector) {
+            Array.from(routeSelector.options).forEach(opt => {
+                opt.selected = (opt.value === 'all');
+            });
+        }
+    }
+    
     // Reload route paths if in routes or both mode
     if (mapViewMode === 'routes' || mapViewMode === 'both') {
+        console.log('Reloading route paths with selection:', selectedRoutes);
         loadRoutePaths();
     }
 }
@@ -1027,6 +1060,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     routeSelector.options[0].selected = true;
                 }
             }
+            // Reset selectedRoutes to ['all']
+            selectedRoutes = ['all'];
             
             stopsData = allStops;
             
@@ -1042,11 +1077,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         console.error('Failed to load routes on reset:', error);
                     });
                 } else {
-                    clearRoutePolylines();
+                clearRoutePolylines();
                 }
                 
                 if (mapViewMode === 'stops' || mapViewMode === 'both') {
-                    updateMapMarkers();
+                updateMapMarkers();
                 } else {
                     // Clear markers when showing only routes
                     markers.forEach(marker => map.removeLayer(marker));
@@ -1205,7 +1240,7 @@ async function init() {
             if (mapViewMode === 'stops' || mapViewMode === 'both') {
                 updateDetailsPanelForViewMode();
             }
-        }, 500);
+    }, 500);
     }, 500);
     
     console.log('App initialized');
