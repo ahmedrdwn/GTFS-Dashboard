@@ -247,7 +247,17 @@ async function loadStops() {
     try {
         console.log('Loading stops...');
         hideMapLoading();
-        const response = await fetch('/api/stops');
+        
+        // Add timeout to fetch request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
+        const response = await fetch('/api/stops', {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
         if (!response.ok) {
             throw new Error(`Failed to fetch stops: ${response.status}`);
         }
@@ -1311,5 +1321,12 @@ async function init() {
 // Start the app
 document.addEventListener('DOMContentLoaded', init);
 
-// Refresh KPIs every 30 seconds
-setInterval(loadKPIs, 30000);
+// Refresh KPIs every 30 seconds (only if on home page)
+setInterval(() => {
+    const homePage = document.getElementById('page-home');
+    if (homePage && homePage.classList.contains('active')) {
+        loadKPIs().catch(error => {
+            console.error('Error refreshing KPIs:', error);
+        });
+    }
+}, 30000);
