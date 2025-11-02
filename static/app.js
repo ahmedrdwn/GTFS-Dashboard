@@ -373,21 +373,21 @@ async function loadRoutePaths() {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
             }
-        
-        const allPaths = await response.json();
-        
-        if (!allPaths || allPaths.length === 0) {
-            console.warn('No route paths returned from API');
-            const panelContent = document.getElementById('panel-content');
-            if (panelContent) {
-                panelContent.innerHTML = '<div class="error-message">No route paths available. Make sure GTFS data is loaded.</div>';
+            
+            const allPaths = await response.json();
+            
+            if (!allPaths || allPaths.length === 0) {
+                console.warn('No route paths returned from API');
+                const panelContent = document.getElementById('panel-content');
+                if (panelContent) {
+                    panelContent.innerHTML = '<div class="error-message">No route paths available. Make sure GTFS data is loaded.</div>';
+                }
+                return;
             }
-            return;
-        }
-        
-        console.log(`Loading ${allPaths.length} route paths`);
-        
-        allPaths.forEach((routePath, index) => {
+            
+            console.log(`Loading ${allPaths.length} route paths`);
+            
+            allPaths.forEach((routePath, index) => {
             const route = routePath.route;
             const coordinates = routePath.coordinates;
             
