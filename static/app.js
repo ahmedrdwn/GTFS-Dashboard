@@ -419,87 +419,87 @@ async function loadRoutePaths() {
                 
                 // Convert coordinates format: [lat, lon] is correct for Leaflet
                 const latLngs = coordinates.map(coord => {
-                // Handle both [lat, lon] and [lon, lat] formats
-                if (Array.isArray(coord) && coord.length >= 2) {
-                    const lat = parseFloat(coord[0]);
-                    const lon = parseFloat(coord[1]);
-                    
-                    // Validate coordinates
-                    if (isNaN(lat) || isNaN(lon)) {
-                        console.warn(`Route ${routePath.route_id}: Invalid coordinate ${coord}`);
-                        return null;
+                    // Handle both [lat, lon] and [lon, lat] formats
+                    if (Array.isArray(coord) && coord.length >= 2) {
+                        const lat = parseFloat(coord[0]);
+                        const lon = parseFloat(coord[1]);
+                        
+                        // Validate coordinates
+                        if (isNaN(lat) || isNaN(lon)) {
+                            console.warn(`Route ${routePath.route_id}: Invalid coordinate ${coord}`);
+                            return null;
+                        }
+                        
+                        // Ensure valid lat/lon ranges
+                        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                            console.warn(`Route ${routePath.route_id}: Coordinate out of range (${lat}, ${lon})`);
+                            return null;
+                        }
+                        
+                        return [lat, lon]; // [lat, lon] for Leaflet
                     }
-                    
-                    // Ensure valid lat/lon ranges
-                    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-                        console.warn(`Route ${routePath.route_id}: Coordinate out of range (${lat}, ${lon})`);
-                        return null;
-                    }
-                    
-                    return [lat, lon]; // [lat, lon] for Leaflet
+                    console.warn(`Route ${routePath.route_id}: Invalid coordinate format`, coord);
+                    return null;
+                    }).filter(coord => coord !== null);
+                
+                if (latLngs.length < 2) {
+                    console.log(`Skipping route ${routePath.route_id} - only ${latLngs.length} valid coordinates (need at least 2)`);
+                    return;
                 }
-                console.warn(`Route ${routePath.route_id}: Invalid coordinate format`, coord);
-                return null;
-            }).filter(coord => coord !== null);
-            
-            if (latLngs.length < 2) {
-                console.log(`Skipping route ${routePath.route_id} - only ${latLngs.length} valid coordinates (need at least 2)`);
-                return;
-            }
-            
-            console.log(`Route ${routePath.route_id}: ${latLngs.length} coordinates, first: [${latLngs[0][0]}, ${latLngs[0][1]}], last: [${latLngs[latLngs.length-1][0]}, ${latLngs[latLngs.length-1][1]}]`);
-            
-            // Draw polyline with distinct color and better visibility
-            const polyline = L.polyline(latLngs, {
-                color: routeColor,
-                weight: 6,
-                opacity: 0.8,
-                smoothFactor: 1,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }).addTo(map);
-            
-            // Add popup with route info
-            const routeName = route.route_short_name || route.route_id;
-            const routeLongName = route.route_long_name || '';
-            polyline.bindPopup(`
-                <div style="font-weight: 600; margin-bottom: 8px;">
-                    <strong style="color: ${routeColor}; font-size: 1.2em;">Route ${routeName}</strong>
-                </div>
-                <div style="color: #495965; margin-bottom: 5px;">
-                    ${routeLongName || 'No description'}
-                </div>
-                <div style="font-size: 0.9em; color: #718096;">
-                    ${routePath.total_stops} stops on this route
-                </div>
-            `);
-            
-            // Add hover effect
-            polyline.on('mouseover', function() {
-                this.setStyle({
-                    weight: 8,
-                    opacity: 1.0
-                });
-            });
-            
-            polyline.on('mouseout', function() {
-                this.setStyle({
+                
+                console.log(`Route ${routePath.route_id}: ${latLngs.length} coordinates, first: [${latLngs[0][0]}, ${latLngs[0][1]}], last: [${latLngs[latLngs.length-1][0]}, ${latLngs[latLngs.length-1][1]}]`);
+                
+                // Draw polyline with distinct color and better visibility
+                const polyline = L.polyline(latLngs, {
+                    color: routeColor,
                     weight: 6,
-                    opacity: 0.8
+                    opacity: 0.8,
+                    smoothFactor: 1,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(map);
+                
+                // Add popup with route info
+                const routeName = route.route_short_name || route.route_id;
+                const routeLongName = route.route_long_name || '';
+                polyline.bindPopup(`
+                    <div style="font-weight: 600; margin-bottom: 8px;">
+                        <strong style="color: ${routeColor}; font-size: 1.2em;">Route ${routeName}</strong>
+                    </div>
+                    <div style="color: #495965; margin-bottom: 5px;">
+                        ${routeLongName || 'No description'}
+                    </div>
+                    <div style="font-size: 0.9em; color: #718096;">
+                        ${routePath.total_stops} stops on this route
+                    </div>
+                `);
+                
+                // Add hover effect
+                polyline.on('mouseover', function() {
+                    this.setStyle({
+                        weight: 8,
+                        opacity: 1.0
+                    });
                 });
+                
+                polyline.on('mouseout', function() {
+                    this.setStyle({
+                        weight: 6,
+                        opacity: 0.8
+                    });
+                });
+                
+                // Add click handler to show route details in panel
+                polyline.on('click', function() {
+                    showRouteDetailsInPanel(routePath.route_id);
+                });
+                
+                routePolylines.push(polyline);
             });
             
-            // Add click handler to show route details in panel
-            polyline.on('click', function() {
-                showRouteDetailsInPanel(routePath.route_id);
-            });
-            
-            routePolylines.push(polyline);
-        });
-        
             console.log(`Displayed ${routePolylines.length} route polylines with different colors`);
-        
-        if (routePolylines.length === 0) {
+            
+            if (routePolylines.length === 0) {
             console.warn('No route polylines were created. Check coordinate data.');
             const panelContent = document.getElementById('panel-content');
             if (panelContent) {
