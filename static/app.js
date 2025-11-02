@@ -1376,7 +1376,9 @@ function setupNavigation() {
             setTimeout(() => {
                 const targetPageElement = document.getElementById(`page-${targetPage}`);
                 if (targetPageElement) {
+                    console.log(`Switching to page: ${targetPage}`, targetPageElement);
                     targetPageElement.classList.add('active');
+                    targetPageElement.style.display = 'block'; // Ensure display is set
                     targetPageElement.style.opacity = '0';
                     requestAnimationFrame(() => {
                         targetPageElement.style.transition = 'opacity 0.3s ease-in';
@@ -1385,6 +1387,8 @@ function setupNavigation() {
                     
                     // Initialize page-specific functions
                     initializePage(targetPage);
+                } else {
+                    console.error(`Page element not found: page-${targetPage}`);
                 }
                 
                 // Re-enable buttons after transition
