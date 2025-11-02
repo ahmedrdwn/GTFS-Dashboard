@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTFS Transit Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚌 GTFS Transit Dashboard</h1>
+            <p class="subtitle">Interactive map and KPI analytics</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="main-nav">
+            <button class="nav-btn active" data-page="home">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">Home</span>
+            </button>
+            <button class="nav-btn" data-page="routes">
+                <span class="nav-icon">🛣️</span>
+                <span class="nav-text">Routes</span>
+            </button>
+            <button class="nav-btn" data-page="upload">
+                <span class="nav-icon">📤</span>
+                <span class="nav-text">Upload GTFS</span>
+            </button>
+            <button class="nav-btn" data-page="archive">
+                <span class="nav-icon">📚</span>
+                <span class="nav-text">Archive</span>
+            </button>
+            <button class="nav-btn" data-page="editor">
+                <span class="nav-icon">✏️</span>
+                <span class="nav-text">Map Editor</span>
+            </button>
+        </nav>
+
+        <div class="main-content">
+            <!-- Home Page -->
+            <div id="page-home" class="page active">
+            <!-- KPI Cards -->
+            <section class="kpi-section">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon">📍</div>
+                        <div class="kpi-value" id="kpi-total-stops">-</div>
+                        <div class="kpi-label">Total Stops</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon">🛣️</div>
+                        <div class="kpi-value" id="kpi-total-routes">-</div>
+                        <div class="kpi-label">Total Routes</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon">🚏</div>
+                        <div class="kpi-value" id="kpi-total-trips">-</div>
+                        <div class="kpi-label">Total Trips</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon">⏱️</div>
+                        <div class="kpi-value" id="kpi-avg-headway">-</div>
+                        <div class="kpi-label">Avg Headway (min)</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon">⏰</div>
+                        <div class="kpi-value" id="kpi-avg-duration">-</div>
+                        <div class="kpi-label">Avg Trip Duration (min)</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Controls -->
+            <section class="controls-section">
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="map-view-toggle">Map View:</label>
+                        <select id="map-view-toggle" class="control-select">
+                            <option value="stops">Show Stops</option>
+                            <option value="routes">Show Routes</option>
+                            <option value="both">Show Both</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="route-filter">Filter by Route:</label>
+                        <select id="route-filter" class="control-select">
+                            <option value="all">All Routes</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="route-selector">Select Routes:</label>
+                        <select id="route-selector" class="control-select" multiple size="3">
+                            <option value="all">All Routes</option>
+                        </select>
+                    </div>
+                    <button id="reset-view" class="btn-secondary">Reset View</button>
+                </div>
+            </section>
+
+            <!-- Map and Details -->
+            <section class="map-section">
+                <div class="map-container">
+                    <div id="map"></div>
+                </div>
+                <div class="details-panel" id="details-panel">
+                    <div class="panel-header">
+                        <h3 id="panel-title">Stop Details</h3>
+                        <button id="close-panel" class="close-btn">×</button>
+                    </div>
+                    <div class="panel-content" id="panel-content">
+                        <p class="placeholder">Click on a stop marker to see details</p>
+                    </div>
+                </div>
+            </section>
+            </div>
+
+            <!-- Routes Page -->
+            <div id="page-routes" class="page">
+                <div class="routes-header">
+                    <h2>All Routes</h2>
+                    <div class="routes-filters">
+                        <input type="text" id="route-search" placeholder="Search by route name or ID..." class="search-input">
+                        <select id="service-filter" class="filter-select">
+                            <option value="all">All Services</option>
+                            <option value="WEEKDAY">Weekday</option>
+                            <option value="WEEKEND">Weekend</option>
+                            <option value="DAILY">Daily</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="routes-grid" class="routes-grid">
+                    <div class="loading">Loading routes...</div>
+                </div>
+            </div>
+
+            <!-- Route Detail Modal -->
+            <div id="route-detail-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="modal-route-title">Route Details</h2>
+                        <button class="modal-close" id="close-modal">×</button>
+                    </div>
+                    <div class="modal-body" id="modal-body">
+                        <div class="loading">Loading route details...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload GTFS Page -->
+            <div id="page-upload" class="page">
+                <div class="upload-page">
+                    <h2>📤 GTFS Upload & Analysis</h2>
+                    <p class="page-description">Upload a GTFS ZIP file to analyze transit data and update the dashboard</p>
+                    
+                    <!-- Upload Section -->
+                    <section class="upload-section">
+                        <div class="upload-card">
+                            <h3>Upload GTFS ZIP File</h3>
+                            
+                            <!-- Optional Dataset Info -->
+                            <div class="upload-info-fields">
+                                <div class="form-group">
+                                    <label for="dataset-name">Dataset Name (optional):</label>
+                                    <input type="text" id="dataset-name" class="form-input" placeholder="Enter a name for this dataset...">
+                                    <small>Leave empty to use the filename</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="dataset-notes">Notes (optional):</label>
+                                    <textarea id="dataset-notes" class="form-textarea" placeholder="Add any notes about this dataset..."></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="upload-area" id="upload-area">
+                                <input type="file" id="gtfs-file-input" accept=".zip" style="display: none;">
+                                <div class="upload-dropzone" id="upload-dropzone">
+                                    <div class="upload-icon">📁</div>
+                                    <p id="dropzone-text">Click to select or drag & drop a GTFS ZIP file</p>
+                                    <small>Accepts: .zip files containing stops.txt, routes.txt, trips.txt, stop_times.txt</small>
+                                </div>
+                                
+                                <!-- Progress Bar -->
+                                <div id="upload-progress-container" class="upload-progress-container" style="display: none;">
+                                    <div class="progress-header">
+                                        <span id="progress-status">Processing...</span>
+                                        <span id="progress-percent">0%</span>
+                                    </div>
+                                    <div class="progress-bar-wrapper">
+                                        <div id="upload-progress-bar" class="progress-bar" style="width: 0%"></div>
+                                    </div>
+                                    <div id="progress-steps" class="progress-steps"></div>
+                                </div>
+                                
+                                <div id="upload-status" class="upload-status"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Analysis Results -->
+                    <div id="analysis-results" style="display: none;">
+                        <!-- KPI Cards -->
+                        <section class="kpi-section">
+                            <h3>Data Summary</h3>
+                            <div class="kpi-grid">
+                                <div class="kpi-card">
+                                    <div class="kpi-icon">🛣️</div>
+                                    <div class="kpi-value" id="upload-routes">-</div>
+                                    <div class="kpi-label">Routes</div>
+                                </div>
+                                <div class="kpi-card">
+                                    <div class="kpi-icon">🚏</div>
+                                    <div class="kpi-value" id="upload-trips">-</div>
+                                    <div class="kpi-label">Trips</div>
+                                </div>
+                                <div class="kpi-card">
+                                    <div class="kpi-icon">📍</div>
+                                    <div class="kpi-value" id="upload-stops">-</div>
+                                    <div class="kpi-label">Stops</div>
+                                </div>
+                                <div class="kpi-card">
+                                    <div class="kpi-icon">⏰</div>
+                                    <div class="kpi-value" id="upload-avg-duration">-</div>
+                                    <div class="kpi-label">Avg Trip Duration (min)</div>
+                                </div>
+                                <div class="kpi-card">
+                                    <div class="kpi-icon">🚌</div>
+                                    <div class="kpi-value" id="upload-stop-times">-</div>
+                                    <div class="kpi-label">Stop Times</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Data Previews -->
+                        <section class="preview-section">
+                            <h3>Data Previews</h3>
+                            <div class="preview-tabs">
+                                <div class="tab-buttons">
+                                    <button class="tab-btn active" data-tab="routes">Routes</button>
+                                    <button class="tab-btn" data-tab="stops">Stops</button>
+                                    <button class="tab-btn" data-tab="trips">Trips</button>
+                                    <button class="tab-btn" data-tab="stop_times">Stop Times</button>
+                                    <button class="tab-btn" data-tab="calendar">Calendar</button>
+                                </div>
+                                <div class="tab-contents">
+                                    <div class="tab-content active" id="tab-routes">
+                                        <div class="preview-table-container">
+                                            <table class="preview-table" id="preview-routes"></table>
+                                        </div>
+                                    </div>
+                                    <div class="tab-content" id="tab-stops">
+                                        <div class="preview-table-container">
+                                            <table class="preview-table" id="preview-stops"></table>
+                                        </div>
+                                    </div>
+                                    <div class="tab-content" id="tab-trips">
+                                        <div class="preview-table-container">
+                                            <table class="preview-table" id="preview-trips"></table>
+                                        </div>
+                                    </div>
+                                    <div class="tab-content" id="tab-stop_times">
+                                        <div class="preview-table-container">
+                                            <table class="preview-table" id="preview-stop_times"></table>
+                                        </div>
+                                    </div>
+                                    <div class="tab-content" id="tab-calendar">
+                                        <div class="preview-table-container">
+                                            <table class="preview-table" id="preview-calendar"></table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Map Preview -->
+                        <section class="map-preview-section">
+                            <h3>Stops Map Preview</h3>
+                            <div id="upload-map" class="upload-map"></div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Archive Page -->
+            <div id="page-archive" class="page">
+                <div class="archive-page">
+                    <h2>📚 GTFS Data Archive</h2>
+                    <p class="page-description">Browse, view, and manage your uploaded GTFS datasets</p>
+                    
+                    <!-- Search and Filters -->
+                    <section class="archive-controls">
+                        <div class="archive-search-bar">
+                            <input type="text" id="archive-search" placeholder="Search by name or notes..." class="search-input">
+                            <button id="archive-refresh-btn" class="btn-secondary">🔄 Refresh</button>
+                        </div>
+                        <div class="archive-filters">
+                            <label for="archive-sort">Sort by:</label>
+                            <select id="archive-sort" class="filter-select">
+                                <option value="date-desc">Date (Newest First)</option>
+                                <option value="date-asc">Date (Oldest First)</option>
+                                <option value="name-asc">Name (A-Z)</option>
+                                <option value="name-desc">Name (Z-A)</option>
+                                <option value="routes-desc">Routes (Most First)</option>
+                            </select>
+                        </div>
+                    </section>
+
+                    <!-- Archive Table -->
+                    <section class="archive-table-section">
+                        <div id="archive-loading" class="loading" style="display: none;">Loading archive...</div>
+                        <div id="archive-empty" class="archive-empty" style="display: none;">
+                            <div class="empty-icon">📭</div>
+                            <h3>No datasets found</h3>
+                            <p>Upload your first GTFS dataset to get started!</p>
+                        </div>
+                        <div id="archive-table-container" style="display: none;">
+                            <table class="archive-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Upload Date</th>
+                                        <th>Routes</th>
+                                        <th>Trips</th>
+                                        <th>Stops</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="archive-table-body">
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Archive Detail Modal -->
+            <div id="archive-detail-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="archive-modal-title">Dataset Details</h2>
+                        <button class="modal-close" id="archive-close-modal">×</button>
+                    </div>
+                    <div class="modal-body" id="archive-modal-body">
+                        <div class="loading">Loading dataset details...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Routes Map Editor Page -->
+            <div id="page-editor" class="page">
+                <div class="editor-page">
+                    <h2>✏️ Routes Map Editor</h2>
+                    <p class="page-description">Edit route details and geometry on an interactive map</p>
+                    
+                    <!-- Editor Controls -->
+                    <section class="editor-controls">
+                        <div class="editor-toolbar">
+                            <div class="toolbar-group">
+                                <label for="editor-route-select">Select Route:</label>
+                                <select id="editor-route-select" class="control-select">
+                                    <option value="">Select a route...</option>
+                                </select>
+                            </div>
+                            <div class="toolbar-group">
+                                <button id="edit-mode-btn" class="btn-secondary" disabled>Edit Mode</button>
+                                <button id="save-route-btn" class="btn-primary" disabled>Save Changes</button>
+                                <button id="cancel-edit-btn" class="btn-cancel" disabled>Cancel</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Route Info Cards -->
+                    <section class="editor-kpis" id="editor-kpis" style="display: none;">
+                        <div class="kpi-grid">
+                            <div class="kpi-card">
+                                <div class="kpi-icon">🛣️</div>
+                                <div class="kpi-value" id="editor-route-name">-</div>
+                                <div class="kpi-label">Selected Route</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-icon">📍</div>
+                                <div class="kpi-value" id="editor-stop-count">-</div>
+                                <div class="kpi-label">Stops on Route</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-icon">📏</div>
+                                <div class="kpi-value" id="editor-distance">-</div>
+                                <div class="kpi-label">Distance (km)</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-icon">🚏</div>
+                                <div class="kpi-value" id="editor-trip-count">-</div>
+                                <div class="kpi-label">Trips</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Editor Layout -->
+                    <section class="editor-layout">
+                        <!-- Map Container -->
+                        <div class="editor-map-container">
+                            <div id="editor-map" class="editor-map"></div>
+                            <div class="map-controls">
+                                <button id="toggle-stops-btn" class="control-btn active">
+                                    <span class="btn-icon">📍</span>
+                                    <span>Show Stops</span>
+                                </button>
+                                <button id="toggle-routes-btn" class="control-btn active">
+                                    <span class="btn-icon">🛣️</span>
+                                    <span>Show Routes</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Route Details Panel -->
+                        <div class="editor-panel" id="editor-panel">
+                            <div class="panel-header">
+                                <h3 id="panel-route-title">Route Details</h3>
+                            </div>
+                            <div class="panel-content" id="editor-panel-content">
+                                <p class="placeholder">Select a route to view and edit details</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/app.js"></script>
+    <script src="/static/routes.js"></script>
+    <script src="/static/upload.js"></script>
+    <script src="/static/archive.js"></script>
+    <script src="/static/editor.js"></script>
+</body>
+</html>
+
