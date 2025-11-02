@@ -1011,7 +1011,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
             currentRouteFilter = 'all';
-            mapViewMode = 'stops';
+            mapViewMode = 'routes'; // Reset to default (routes)
             selectedRoutes = [];
             
             const routeFilter = document.getElementById('route-filter');
@@ -1019,7 +1019,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 routeFilter.value = 'all';
             }
             if (mapViewToggle) {
-                mapViewToggle.value = 'stops';
+                mapViewToggle.value = 'routes'; // Reset to default (routes)
             }
             if (routeSelector) {
                 Array.from(routeSelector.options).forEach(opt => opt.selected = false);
@@ -1035,8 +1035,24 @@ document.addEventListener('DOMContentLoaded', function() {
             resetBtn.disabled = true;
             
             setTimeout(() => {
-                clearRoutePolylines();
-                updateMapMarkers();
+                if (mapViewMode === 'routes' || mapViewMode === 'both') {
+                    loadRoutePaths().then(() => {
+                        updateDetailsPanelForViewMode();
+                    }).catch((error) => {
+                        console.error('Failed to load routes on reset:', error);
+                    });
+                } else {
+                    clearRoutePolylines();
+                }
+                
+                if (mapViewMode === 'stops' || mapViewMode === 'both') {
+                    updateMapMarkers();
+                } else {
+                    // Clear markers when showing only routes
+                    markers.forEach(marker => map.removeLayer(marker));
+                    markers = [];
+                }
+                
                 updateDetailsPanelForViewMode();
                 resetBtn.textContent = 'Reset View';
                 resetBtn.disabled = false;
