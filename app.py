@@ -648,9 +648,9 @@ def get_all_route_paths():
             for st in route_stop_times:
                 trip_id = st.get('trip_id', '').strip() if st.get('trip_id') else ''
                 if trip_id:
-                if trip_id not in trip_paths:
-                    trip_paths[trip_id] = []
-                trip_paths[trip_id].append(st)
+                    if trip_id not in trip_paths:
+                        trip_paths[trip_id] = []
+                    trip_paths[trip_id].append(st)
             
             # Sort each trip's stops by stop_sequence
             for trip_id in trip_paths:
