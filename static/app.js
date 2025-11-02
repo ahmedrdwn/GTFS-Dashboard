@@ -388,37 +388,37 @@ async function loadRoutePaths() {
             console.log(`Loading ${allPaths.length} route paths`);
             
             allPaths.forEach((routePath, index) => {
-            const route = routePath.route;
-            const coordinates = routePath.coordinates;
-            
-            if (!coordinates || coordinates.length < 2) {
-                console.log(`Skipping route ${routePath.route_id} - insufficient coordinates`);
-                return;
-            }
-            
-            // Determine if this route should be displayed
-            // Show route if:
-            // 1. No routes selected (show all by default)
-            // 2. 'all' is in selectedRoutes
-            // 3. This specific route_id is in selectedRoutes
-            const shouldDisplay = 
-                (selectedRoutes.length === 0 || 
-                 selectedRoutes.includes('all') || 
-                 selectedRoutes.includes(routePath.route_id)) &&
-                (mapViewMode === 'routes' || mapViewMode === 'both');
-            
-            if (!shouldDisplay) {
-                console.log(`Skipping route ${routePath.route_id} - not in selection`, selectedRoutes);
-                return;
-            }
-            
-            console.log(`Displaying route ${routePath.route_id}`);
-            
-            // Get route color (different color for each route)
-            const routeColor = getRouteColor(route, index);
-            
-            // Convert coordinates format: [lat, lon] is correct for Leaflet
-            const latLngs = coordinates.map(coord => {
+                const route = routePath.route;
+                const coordinates = routePath.coordinates;
+                
+                if (!coordinates || coordinates.length < 2) {
+                    console.log(`Skipping route ${routePath.route_id} - insufficient coordinates`);
+                    return;
+                }
+                
+                // Determine if this route should be displayed
+                // Show route if:
+                // 1. No routes selected (show all by default)
+                // 2. 'all' is in selectedRoutes
+                // 3. This specific route_id is in selectedRoutes
+                const shouldDisplay = 
+                    (selectedRoutes.length === 0 || 
+                     selectedRoutes.includes('all') || 
+                     selectedRoutes.includes(routePath.route_id)) &&
+                    (mapViewMode === 'routes' || mapViewMode === 'both');
+                
+                if (!shouldDisplay) {
+                    console.log(`Skipping route ${routePath.route_id} - not in selection`, selectedRoutes);
+                    return;
+                }
+                
+                console.log(`Displaying route ${routePath.route_id}`);
+                
+                // Get route color (different color for each route)
+                const routeColor = getRouteColor(route, index);
+                
+                // Convert coordinates format: [lat, lon] is correct for Leaflet
+                const latLngs = coordinates.map(coord => {
                 // Handle both [lat, lon] and [lon, lat] formats
                 if (Array.isArray(coord) && coord.length >= 2) {
                     const lat = parseFloat(coord[0]);
