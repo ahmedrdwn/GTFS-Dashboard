@@ -517,13 +517,13 @@ async function loadRoutePaths() {
             const bounds = L.latLngBounds([]);
             routePolylines.forEach(polyline => {
                 try {
-                bounds.extend(polyline.getBounds());
+                    bounds.extend(polyline.getBounds());
                 } catch (e) {
                     console.error('Error extending bounds:', e);
                 }
             });
             if (bounds.isValid()) {
-            map.fitBounds(bounds.pad(0.1));
+                map.fitBounds(bounds.pad(0.1));
                 console.log('Map fitted to show all routes');
             }
         } else if (routePolylines.length > 0 && mapViewMode === 'both') {

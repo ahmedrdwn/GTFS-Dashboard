@@ -94,8 +94,8 @@ def load_csv(filepath):
                     clean_row[clean_key] = clean_value
                 data.append(clean_row)
             
-            # Debug: Print first row to see column names
-            if data and filepath.endswith('routes.txt'):
+            # Debug: Print first row to see column names (only in debug mode)
+            if data and filepath.endswith('routes.txt') and app.debug:
                 print(f"DEBUG: routes.txt columns = {list(data[0].keys())}")
                 print(f"DEBUG: First route row = {data[0]}")
                 print(f"DEBUG: route_id from first row = '{data[0].get('route_id', 'NOT FOUND')}'")
@@ -189,11 +189,10 @@ def get_kpis():
     routes = load_csv(routes_file)
     trips = load_csv(trips_file)
     stop_times = load_csv(stop_times_file)
-    trips_data = load_csv(trips_file)
     
     print(f"KPI Calculation: Loaded {len(routes)} routes, {len(trips)} trips, {len(stop_times)} stop_times")
     
-    trip_to_route = {trip['trip_id']: trip['route_id'] for trip in trips_data if 'trip_id' in trip and 'route_id' in trip}
+    trip_to_route = {trip['trip_id']: trip['route_id'] for trip in trips if 'trip_id' in trip and 'route_id' in trip}
     
     # KPI A: Total unique routes - handle None values
     route_ids = []
