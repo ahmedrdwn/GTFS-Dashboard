@@ -1165,13 +1165,6 @@ function setupNavigation() {
                 targetPageElement.classList.add('active');
             }
             
-            // Initialize routes page if needed
-            if (targetPage === 'routes') {
-                if (typeof initRoutesPage === 'function') {
-                    initRoutesPage();
-                }
-            }
-            
             // Initialize upload page if needed
             if (targetPage === 'upload') {
                 if (typeof initUploadPage === 'function') {
@@ -1186,12 +1179,6 @@ function setupNavigation() {
                 }
             }
             
-            // Initialize editor page if needed
-            if (targetPage === 'editor') {
-                if (typeof initEditorPage === 'function') {
-                    initEditorPage();
-                }
-            }
         });
     });
 }
